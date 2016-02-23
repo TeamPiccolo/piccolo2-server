@@ -10,10 +10,12 @@ class PiccoloDispatcher(object):
         self._clients = []
 
     def registerComponent(self,name,component):
+        assert isinstance(component,piccolo.PiccoloInstrument)
         self._components[name] = component
 
-    def registerController(self,taskQ,doneQ):
-        self._clients.append((taskQ,doneQ))
+    def registerController(self,controller):
+        assert isinstance(controller,piccolo.PiccoloController)
+        self._clients.append((controller.taskQ,controller.doneQ))
         
     def getComponentList(self):
         return self._components.keys()
@@ -35,7 +37,6 @@ class PiccoloDispatcher(object):
                     waitALittle = False
 
                     if task[0] == 'stop':
-                        dq.put('stopped')
                         done = True
                     elif task[0] == 'components':
                         dq.put(self.getComponentList())
@@ -43,34 +44,36 @@ class PiccoloDispatcher(object):
                         dq.put(self._execute(task[0],task[1],task[2]))
             if waitALittle:
                 if done:
+                    # tell components to stop
                     for c in self._components:
                         self._execute(c,'stop')
+                    # tell all clients that the system has stopped
+                    for tq,dq in self._clients:
+                        dq.put('stopped')
                     return
                 time.sleep(self.DELAY)
 
 if __name__ == '__main__':
-    import Queue
     
     pd = PiccoloDispatcher()
     pd.registerComponent('piccolo',piccolo.Piccolo())
     print pd.getComponentList()
     print pd._execute('piccolo','ping')
 
-    taskQ = Queue.Queue()
-    doneQ = Queue.Queue()
+    pc = piccolo.PiccoloController()
 
-    pd.registerController(taskQ,doneQ)
+    pd.registerController(pc)
 
-    taskQ.put(('components',None,{}))
-    taskQ.put(('piccolo','ping',{}))
-    taskQ.put(('stop',None,{}))
+    pc.taskQ.put(('components',None,{}))
+    pc.taskQ.put(('piccolo','ping',{}))
+    pc.taskQ.put(('stop',None,{}))
 
     pd.run()
 
     print
     print 'processing queue'
     while True:
-        d = doneQ.get()
+        d = pc.doneQ.get()
         print d
         if d=='stopped':
             break
