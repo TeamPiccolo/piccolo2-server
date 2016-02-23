@@ -11,17 +11,12 @@ if __name__ == '__main__':
 
     pd.registerController(pc)
 
-    pc.taskQ.put(('components',None,{}))
-    pc.taskQ.put(('piccolo','ping',{}))
-    pc.taskQ.put(('stop',None,{}))
+    pd.start()
 
-    pd.run()
+    print pc.call('components')
+    print pc.call('ping','piccol')
+    print pc.call('pin','piccolo')
+    print pc.call('ping','piccolo')
 
-    print
-    print 'processing queue'
-    while True:
-        d = pc.doneQ.get()
-        print d
-        if d=='stopped':
-            break
-        
+    pc.call('stop')
+
