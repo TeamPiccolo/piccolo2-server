@@ -13,10 +13,10 @@ if __name__ == '__main__':
 
     pd.start()
 
-    print pc.call('components')
+    print pc.components()
     print pc.call('ping','piccol')
     print pc.call('pin','piccolo')
     print pc.call('ping','piccolo')
 
-    pc.call('stop')
+    pc.stop()
 
