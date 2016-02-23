@@ -1,22 +1,17 @@
 import piccolo
+import cherrypy
 
 if __name__ == '__main__':
-    
-    pd = piccolo.PiccoloDispatcher()
-    pd.registerComponent('piccolo',piccolo.Piccolo())
-    print pd.getComponentList()
-    print pd._execute('piccolo','ping')
 
-    pc = piccolo.PiccoloController()
+    pd = piccolo.PiccoloDispatcher(daemon=True)
+    pd.registerComponent('piccolo',piccolo.Piccolo())
+
+    pc = piccolo.PiccoloControllerCherryPy()
 
     pd.registerController(pc)
 
     pd.start()
 
-    print pc.components()
-    print pc.call('ping','piccol')
-    print pc.call('pin','piccolo')
-    print pc.call('ping','piccolo')
+    cherrypy.quickstart(pc)
 
-    pc.stop()
 
