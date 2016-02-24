@@ -1,4 +1,4 @@
-import piccolo
+import piccolo_server as piccolo
 import cherrypy
 
 if __name__ == '__main__':
