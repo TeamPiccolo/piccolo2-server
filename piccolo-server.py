@@ -4,7 +4,7 @@ import cherrypy
 if __name__ == '__main__':
 
     pd = piccolo.PiccoloDispatcher(daemon=True)
-    pd.registerComponent('piccolo',piccolo.Piccolo())
+    pd.registerComponent(piccolo.Piccolo('piccolo'))
 
     pc = piccolo.PiccoloControllerCherryPy()
 

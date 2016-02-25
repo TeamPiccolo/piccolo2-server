@@ -10,8 +10,15 @@ class PiccoloInstrument(object):
     """base class used to define instruments attached to the piccolo system
     """
 
-    def __init__(self):
-        pass
+    def __init__(self,name):
+        """
+        :param name: name of the component"""
+        self._name = name
+
+    @property
+    def name(self):
+        """the name of the component"""
+        return self._name
 
     def ping(self):
         """ping instrument
@@ -32,6 +39,6 @@ class PiccoloInstrument(object):
 
 if __name__ == '__main__':
 
-    p = PiccoloInstrument()
+    p = PiccoloInstrument("test")
     print p.ping()
     print p.status()

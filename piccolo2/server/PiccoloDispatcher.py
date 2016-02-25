@@ -32,14 +32,13 @@ class PiccoloDispatcher(threading.Thread):
         self._components = {}
         self._clients = []
 
-    def registerComponent(self,name,component):
+    def registerComponent(self,component):
         """register a component, ie instrument
 
-        :param name: the name of the component
         :param component: the instance of a piccolo instrument
         :type component: PiccoloInstrument"""
         assert isinstance(component,PiccoloInstrument)
-        self._components[name] = component
+        self._components[component.name] = component
 
     def registerController(self,controller):
         """register a controller

@@ -24,7 +24,7 @@ class Piccolo(PiccoloInstrument):
         return info
 
 if __name__ == '__main__':
-    p = Piccolo()
+    p = Piccolo("piccolo")
     print p.ping()
     print p.status()
     print p.info()
