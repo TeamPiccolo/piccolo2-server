@@ -5,6 +5,7 @@
 
 __all__ = ['PiccoloDispatcher']
 
+import logging
 import threading
 import time
 import sys
@@ -32,11 +33,21 @@ class PiccoloDispatcher(threading.Thread):
         self._components = {}
         self._clients = []
 
+        self._log = logging.getLogger('piccolo.dispatcher')
+
+        self.log.info("initialised")
+
+    @property
+    def log(self):
+        """get the logger"""
+        return self._log
+
     def registerComponent(self,component):
         """register a component, ie instrument
 
         :param component: the instance of a piccolo instrument
         :type component: PiccoloInstrument"""
+        self.log.info('registering component {0}'.format(component.name))
         assert isinstance(component,PiccoloInstrument)
         self._components[component.name] = component
 
@@ -60,6 +71,9 @@ class PiccoloDispatcher(threading.Thread):
         :param command: the command to run
         :param kwds: dictionary containing command parameters
         :returns: result of running command"""
+
+        self.log.debug('invoke {0} {1}'.format(component,command))
+
         if component not in self._components:
             raise KeyError, 'unkown component {0}'.format(component)
         if not hasattr(self._components[component],command):
@@ -80,6 +94,7 @@ class PiccoloDispatcher(threading.Thread):
                     waitALittle = False
 
                     if task[0] == 'stop':
+                        self.log.info("about to stop")
                         done = True
                     elif task[0] == 'components':
                         dq.put(('ok',self.getComponentList()))
@@ -87,6 +102,7 @@ class PiccoloDispatcher(threading.Thread):
                         try:
                             result = 'ok',self.invoke(task[1],task[0],task[2])
                         except:
+                            self.log.error('{0} {1}: {2}'.format(task[1],task[0],sys.exc_info()[1].message))
                             result = 'nok',sys.exc_info()[1].message
                         dq.put(result)
             if waitALittle:

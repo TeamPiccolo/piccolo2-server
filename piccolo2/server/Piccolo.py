@@ -18,12 +18,16 @@ class Piccolo(PiccoloInstrument):
 
         :returns: dictionary containing system information
         :rtype: dict"""
+        self.log.debug("info")
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
                 'virtual_memory': dict(psutil.virtual_memory()._asdict())}
         return info
 
 if __name__ == '__main__':
+    from piccoloLogging import *
+
+    piccoloLogging(debug=True)
     p = Piccolo("piccolo")
     print p.ping()
     print p.status()
