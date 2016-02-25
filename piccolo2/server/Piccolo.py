@@ -1,3 +1,8 @@
+"""
+.. moduleauthor:: Magnus Hagdorn <magnus.hagdorn@ed.ac.uk>
+
+"""
+
 __all__ = ['Piccolo']
 
 from PiccoloInstrument import PiccoloInstrument
@@ -5,7 +10,14 @@ import socket
 import psutil
 
 class Piccolo(PiccoloInstrument):
+    """piccolo server instrument
+
+    the piccolo server itself is treated as an instrument"""
     def info(self):
+        """get info
+
+        :returns: dictionary containing system information
+        :rtype: dict"""
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
                 'virtual_memory': dict(psutil.virtual_memory()._asdict())}
