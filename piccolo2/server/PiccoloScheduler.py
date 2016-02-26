@@ -9,31 +9,44 @@ class PiccoloScheduledJob(object):
     a job will only get scheduled if it is in the future
     """
 
+    ISOFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+
     def __init__(self,at_time,interval,job,end_time=None,jid=-1):
         """
         :param at_time: the time at which the job should run
-        :type at_time: datetime.datetime
+        :type at_time: datetime.datetime or isoformat string
         :param interval: repeated schedule job if interval is not set to None
-        :type interval: datetime.timedelta
+        :type interval: datetime.timedelta or float (seconds) or None
         :param job: scheduled job object, gets returned when run method is called
         :param end_time: the time after which the job is no longer scheduled
-        :type end_time: datetime.datetime or None
+        :type end_time: datetime.datetime or isoformat string or None
         :param jid: an ID
         :type jid: int
         """
         
         self._log = logging.getLogger('piccolo.scheduledjob')
 
-        assert isinstance(at_time,datetime.datetime)
+        # parse scheduling specs
+        if isinstance(at_time,datetime.datetime):
+            self._at = at_time
+        else:
+            self._at = datetime.datetime.strptime(at_time,self.ISOFORMAT)
+
+        self._interval=None
         if interval!=None:
-            assert isinstance(interval,datetime.timedelta)
+            if isinstance(interval,datetime.timedelta):
+                self._interval=interval
+            else:
+                self._interval=datetime.timedelta(seconds=interval)
+
+        self._end = None
         if end_time!=None:
-            assert isinstance(end_time,datetime.datetime)
+            if isinstance(end_time,datetime.datetime):
+                self._end = end_time
+            else:
+                self._end = datetime.datetime.strptime(end_time,self.ISOFORMAT)
 
         self._jid = jid
-        self._at = at_time
-        self._end = end_time
-        self._interval = interval
         self._job = job
         self._has_run = False
         self._suspended = False
