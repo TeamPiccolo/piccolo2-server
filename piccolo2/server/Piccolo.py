@@ -21,7 +21,7 @@ class Piccolo(PiccoloInstrument):
         self.log.debug("info")
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
-                'virtual_memory': dict(psutil.virtual_memory()._asdict())}
+                'virtual_memory': dict(psutil.virtmem_usage()._asdict())}
         return info
 
 if __name__ == '__main__':

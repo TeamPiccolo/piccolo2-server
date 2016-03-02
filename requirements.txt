@@ -1,0 +1,3 @@
+psutil
+CherryPy > 5
+python-jsonrpc
