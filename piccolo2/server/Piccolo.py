@@ -6,6 +6,7 @@
 __all__ = ['Piccolo']
 
 from PiccoloInstrument import PiccoloInstrument
+from PiccoloDataDir import PiccoloDataDir
 import socket
 import psutil
 import subprocess
@@ -16,6 +17,16 @@ class Piccolo(PiccoloInstrument):
 
     the piccolo server itself is treated as an instrument"""
 
+    def __init__(self,name,datadir):
+        """
+        :param name: name of the component
+        :param datadir: data directory
+        :type datadir: PiccoloDataDir"""
+
+        assert isinstance(datadir,PiccoloDataDir)
+        PiccoloInstrument.__init__(self,name)
+        self._datadir = datadir
+
     def info(self):
         """get info
 
@@ -25,6 +36,10 @@ class Piccolo(PiccoloInstrument):
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
                 'virtual_memory': dict(psutil.virtmem_usage()._asdict())}
+        if self._datadir.isMounted:
+            info['datadir'] = self._datadir.datadir
+        else:
+            info['datadir'] = 'not mounted'
         return info
 
     def getClock(self):
@@ -44,6 +59,20 @@ class Piccolo(PiccoloInstrument):
             return cmdPipe.stdout.read()
         return ''
         
+    def isMountedDataDir(self):
+        """check if datadir is mounted"""
+        return self._datadir.isMounted
+
+    def mountDatadir(self):
+        """attempt to mount datadir"""
+        self._datadir.mount()
+        return 'ok'
+
+    def umountDatadir(self):
+        """attempt to unmount datadir"""
+        self._datadir.umount()
+        return 'ok'
+
 
 if __name__ == '__main__':
     from piccoloLogging import *

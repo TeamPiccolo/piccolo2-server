@@ -22,6 +22,18 @@ debug = boolean(default=False)
 # log to logfile if set otherwise log to stdout
 logfile = string(default=None)
 
+[datadir]
+# control location of output files
+# if datadir is a relative path (ie it does not start with a /) write to PWD or
+# if requested to the mounted device
+datadir = string(default=pdata)
+# set to true to mount a block device (eg a USB stick) for writing data
+mount = boolean(default=False)
+# device to be mounted
+device = string(default=/dev/sda1)
+# the mount point
+mntpnt = string(default=/mnt)
+
 [jsonrpc]
 # The URL on which the piccolo JSON-RPC server is listening. By default listen
 # on http://localhost:8080
@@ -41,11 +53,16 @@ class PiccoloServerConfig(object):
 
         parser = ArgumentParser()
         parser.add_argument('-c','--configuration-file',metavar='CFG',help="read configuration from CFG")
-        parser.add_argument('-d', '--debug', action='store_true',help="enable debugging output")
+        parser.add_argument('-d', '--debug', action='store_true',default=None,help="enable debugging output")
         parser.add_argument('-l', '--log-file',metavar="FILE",help="send piccolo log to FILE, default stdout")
         parser.add_argument('-u','--piccolo-url',metavar='URL',help="set the URL of the piccolo JSON-RPC server, default {}".format(self._cfg['jsonrpc']['url']))
         
+        datagroup = parser.add_argument_group('datadir')
+        datagroup.add_argument('-o','--data-dir',help="name of data directory, default {}".format(self._cfg['datadir']['datadir']))
+        datagroup.add_argument('-m','--mount',default=None,action='store_true',help="mount a device for writing data")
+        
         args = parser.parse_args()
+
         if args.configuration_file!=None:
             self._cfg.filename = args.configuration_file
             self._cfg.reload()
@@ -56,6 +73,10 @@ class PiccoloServerConfig(object):
             self._cfg['logging']['logfile'] = args.log_file
         if args.piccolo_url != None:
             self._cfg['jsonrpc']['url'] = args.piccolo_url
+        if args.data_dir != None:
+            self._cfg['datadir']['datadir'] = args.data_dir
+        if args.mount != None:
+            self._cfg['datadir']['mount'] = args.mount
         
     @property
     def cfg(self):

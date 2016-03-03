@@ -9,12 +9,20 @@ if __name__ == '__main__':
     piccolo.piccoloLogging(logfile=pcfg.cfg['logging']['logfile'],
                            debug=pcfg.cfg['logging']['debug'])
 
+    # create data directory
+    pData = piccolo.PiccoloDataDir(pcfg.cfg['datadir']['datadir'],
+                                   device=pcfg.cfg['datadir']['device'],
+                                   mntpnt=pcfg.cfg['datadir']['mntpnt'],
+                                   mount=pcfg.cfg['datadir']['mount'])
+    # initialise the piccolo component
+    pc = piccolo.Piccolo('piccolo',pData)
+
     pd = piccolo.PiccoloDispatcher(daemon=True)
-    pd.registerComponent(piccolo.Piccolo('piccolo'))
+    pd.registerComponent(pc)
 
-    pc = piccolo.PiccoloControllerCherryPy()
+    pController = piccolo.PiccoloControllerCherryPy()
 
-    pd.registerController(pc)
+    pd.registerController(pController)
 
     pd.start()
 
@@ -22,6 +30,6 @@ if __name__ == '__main__':
     cherrypy.config.update({'server.socket_host':serverUrl.hostname,
                             'server.socket_port':serverUrl.port})
 
-    cherrypy.quickstart(pc)
+    cherrypy.quickstart(pController)
 
 
