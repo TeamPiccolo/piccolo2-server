@@ -38,7 +38,7 @@ class Piccolo(PiccoloInstrument):
 
         :param clock: isoformat date and time string used to set the time"""
         if clock!=None:
-            cmdPipe = subprocess.Popen(['date','-s',clock],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            cmdPipe = subprocess.Popen(['sudo','date','-s',clock],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
             if cmdPipe.wait()!=0:
                 raise OSError, 'setting date to \'{}\': {}'.format(clock,cmdPipe.stderr.read())
             return cmdPipe.stdout.read()
