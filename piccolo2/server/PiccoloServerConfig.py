@@ -16,6 +16,10 @@ defaultCfgStr = """
 # This configuration file controls the basic operation of the piccolo server.
 #
 
+# the piccolo configuration file
+# look for config in data directory if the path is relative
+config = string(default=piccolo.config)
+
 [logging]
 # enable debugging to get extra verbose log
 debug = boolean(default=False)
@@ -52,7 +56,7 @@ class PiccoloServerConfig(object):
         self._cfg.validate(validator)
 
         parser = ArgumentParser()
-        parser.add_argument('-c','--configuration-file',metavar='CFG',help="read configuration from CFG")
+        parser.add_argument('-s','--server-configuration',metavar='CFG',help="read configuration from CFG")
         parser.add_argument('-d', '--debug', action='store_true',default=None,help="enable debugging output")
         parser.add_argument('-l', '--log-file',metavar="FILE",help="send piccolo log to FILE, default stdout")
         parser.add_argument('-u','--piccolo-url',metavar='URL',help="set the URL of the piccolo JSON-RPC server, default {}".format(self._cfg['jsonrpc']['url']))
@@ -63,8 +67,8 @@ class PiccoloServerConfig(object):
         
         args = parser.parse_args()
 
-        if args.configuration_file!=None:
-            self._cfg.filename = args.configuration_file
+        if args.server_configuration!=None:
+            self._cfg.filename = args.server_configuration
             self._cfg.reload()
             self._cfg.validate(validator)
         if args.debug != None:

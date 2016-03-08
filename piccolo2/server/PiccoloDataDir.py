@@ -100,6 +100,15 @@ class PiccoloDataDir(object):
             cmdPipe = subprocess.Popen(['sudo','umount',self._device],stderr=subprocess.PIPE)
             if cmdPipe.wait()!=0:
                 raise OSError, 'unmounting {}: {}'.format(self._device, cmdPipe.stderr.read())
+
+    def join(self,p):
+        """join path to datadir if path is not absolute
+
+        :param p: path to be joined"""
+
+        if not os.path.isabs(p):
+            return os.path.join(self.datadir,p)
+        return p
     
 
 if __name__ == '__main__':
@@ -113,3 +122,5 @@ if __name__ == '__main__':
     print t2.datadir
     t3 = PiccoloDataDir('ptest',mount=True)
     print t3.datadir
+
+    print t3.join('test')
