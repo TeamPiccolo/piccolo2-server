@@ -9,3 +9,4 @@ from PiccoloControllerCherryPy import *
 # the instruments
 from Piccolo import *
 from PiccoloShutter import *
+from PiccoloSpectrometer import *
