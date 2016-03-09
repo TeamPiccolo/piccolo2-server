@@ -34,7 +34,10 @@ if __name__ == '__main__':
                                          fibreDiameter=piccoloCfg.cfg['channels'][cname]['fibreDiameter'])
         pd.registerComponent(channel)
 
-    
+    # initialise the spectrometers
+    for sname in piccoloCfg.cfg['spectrometers']:
+        spectrometer = piccolo.PiccoloSpectrometer(sname)
+        pd.registerComponent(spectrometer)
 
     pController = piccolo.PiccoloControllerCherryPy()
 

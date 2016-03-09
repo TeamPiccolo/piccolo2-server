@@ -41,7 +41,7 @@ defaultCfgStr = """
 [spectrometers]
   [[__many__]]
     detectorTemperature = float(default=None)
-    fan = option(on, off, None)
+    fan = boolean(default=None)
 """
 
 # populate the default  config object which is used as a validator
