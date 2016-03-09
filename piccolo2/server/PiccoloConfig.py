@@ -29,6 +29,19 @@ defaultCfgStr = """
     shutter = integer(default=-1)
     reverse = boolean(default=False) # Is the polarity of the shutter connection reversed?
     fibreDiameter = integer(default=600) # micrometres
+
+# Some spectrometers have adjustable configuration options. For example, the
+# Ocean Optics NIRQuest 512 spectrometer has a detector which is cooled (or
+# heated) by a thermoelectric cooler. The temperature to which the detector will
+# be cooled can be adjusted. A cooler temperature will reduce the electronic
+# noise in the signal and increase the power consumption. The spectrometer's fan
+# can also be turned on or off. These settings will be applied when the
+# Piccolo's hardware is initialized. The settings will be applied only to the
+# spectrometer with the given serial number.
+[spectrometers]
+  [[__many__]]
+    detectorTemperature = float(default=None)
+    fan = option(on, off, None)
 """
 
 # populate the default  config object which is used as a validator
