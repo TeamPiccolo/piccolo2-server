@@ -9,18 +9,18 @@ from PiccoloInstrument import PiccoloInstrument
 import threading
 import time
 
-def shutter(shutter,exposuretime):
+def shutter(shutter,milliseconds):
     """worker function used to open the shutter for the set period
 
     :param shutter: the shutter instance to operate on
     :type shutter: PiccoloShutter
-    :param exposuretime: time to leave shutter open in seconds"""
+    :param milliseconds: time to leave shutter open in milliseconds"""
     assert isinstance(shutter,PiccoloShutter)
     
     result = shutter.openShutter()
     if result!='ok':
         return result
-    time.sleep(exposuretime)
+    time.sleep(milliseconds/1000.)
     result = shutter.closeShutter()
     return result
     
@@ -91,14 +91,14 @@ class PiccoloShutter(PiccoloInstrument):
         self.log.info('closed shutter')
         return 'ok'
 
-    def open_close(self,seconds=1):
+    def open_close(self,milliseconds=1000):
         """open the shutter for a set period
 
-        :param seconds: time to leave shutter open in seconds"""
+        :param milliseconds: time to leave shutter open in milliseconds"""
 
-        self.log.info('opening the shutter for {0} seconds'.format(seconds))
+        self.log.info('opening the shutter for {0} milliseconds'.format(milliseconds))
 
-        t = threading.Thread(target = shutter, args = (self,seconds),name=self.name)
+        t = threading.Thread(target = shutter, args = (self,milliseconds),name=self.name)
         t.daemon=True
         t.start()
                              
@@ -136,12 +136,12 @@ if __name__ == '__main__':
     s.closeShutter()
     s.closeShutter()
 
-    s.open_close(5)
+    s.open_close(5000)
     s.openShutter()
 
     time.sleep(6)
 
-    s.open_close(5)
+    s.open_close(5000)
     time.sleep(2)
     s.closeShutter()
     time.sleep(4)
