@@ -26,10 +26,6 @@ if __name__ == '__main__':
     piccoloCfg = piccolo.PiccoloConfig()
     piccoloCfg.readCfg(pData.join(serverCfg.cfg['config']))
 
-    # initialise the piccolo component
-    pc = piccolo.Piccolo('piccolo',pData)
-    pd.registerComponent(pc)
-
     # initialise the shutters
     ok=True
     for c in ['upwelling','downwelling']:
@@ -38,27 +34,30 @@ if __name__ == '__main__':
             ok=False
     if not ok:
         sys.exit(1)
-    cname = 'upwelling'
-    upwellingShutter = piccolo.PiccoloShutter(
-        cname,
-        channel=piccoloCfg.cfg['channels'][cname]['shutter'],
-        reverse=piccoloCfg.cfg['channels'][cname]['reverse'],
-        fibreDiameter=piccoloCfg.cfg['channels'][cname]['fibreDiameter'])
-    pd.registerComponent(upwellingShutter)
-    cname = 'downwelling'
-    downwellingShutter = piccolo.PiccoloShutter(
-        cname,
-        channel=piccoloCfg.cfg['channels'][cname]['shutter'],
-        reverse=piccoloCfg.cfg['channels'][cname]['reverse'],
-        fibreDiameter=piccoloCfg.cfg['channels'][cname]['fibreDiameter'])
-    pd.registerComponent(downwellingShutter)
+    shutters = {}
+    for c in piccoloCfg.cfg['channels']:
+        if piccoloCfg.cfg['channels'][c]['shutter'] == -1:
+            shutter = None
+        else:
+            raise NotImplementedError
+        shutters[c] = piccolo.PiccoloShutter(c, shutter=shutter,
+                                             reverse=piccoloCfg.cfg['channels'][c]['reverse'],
+                                             fibreDiameter=piccoloCfg.cfg['channels'][c]['fibreDiameter'])
+    for c in shutters:
+        pd.registerComponent(shutters[c])
     
     # initialise the spectrometers
-    spectrometers = []
+    spectrometers = {}
     for sname in piccoloCfg.cfg['spectrometers']:
-        spectrometers.append(piccolo.PiccoloSpectrometer(sname))
-    for s in spectrometers:
-        pd.registerComponent(s)
+        spectrometers[sname] = piccolo.PiccoloSpectrometer(sname)
+    for sname in spectrometers:
+        pd.registerComponent(spectrometers[sname])
+
+    # initialise the piccolo component
+    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers)
+    pd.registerComponent(pc)
+
+
 
     pController = piccolo.PiccoloControllerCherryPy()
 
@@ -66,6 +65,7 @@ if __name__ == '__main__':
 
     pd.start()
 
+    # start the webservice
     serverUrl = urlparse.urlparse(serverCfg.cfg['jsonrpc']['url'])
     cherrypy.config.update({'server.socket_host':serverUrl.hostname,
                             'server.socket_port':serverUrl.port})

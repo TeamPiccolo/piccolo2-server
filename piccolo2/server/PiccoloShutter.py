@@ -28,22 +28,21 @@ def shutter(shutter,milliseconds):
 class PiccoloShutter(PiccoloInstrument):
     """class used to control a shutter"""
 
-    def __init__(self,name,channel=-1,reverse=False,fibreDiameter=600.):
+    def __init__(self,name,shutter=None,reverse=False,fibreDiameter=600.):
         """
         :param name: name of the component
-        :param channel: the shutter channel, if -1 use dummy
+        :param shutter: the shutter object, if None use dummy
         :param reverse: reverse the polarity of the shutter
         :param fibreDiameter: the diameter of the fibre, used for info
         """
 
         PiccoloInstrument.__init__(self,name)
 
-        self._channel = channel
         self._fibre = float(fibreDiameter)
         self._reverse = reverse
 
-        self._shutter = None
-        if self.channel > 0:
+        self._shutter = shutter
+        if self._shutter!=None:
             # TODO: initialise shutter
             # self._shutter = SOMETHING
             self.openShutter()
@@ -51,11 +50,6 @@ class PiccoloShutter(PiccoloInstrument):
             self.closeShutter()
 
         self._lock = threading.Lock()
-
-    @property
-    def channel(self):
-        """the shutter channel"""
-        return self._channel
 
     @property
     def reverse(self):
@@ -119,8 +113,7 @@ class PiccoloShutter(PiccoloInstrument):
         :returns: dictionary containing shutter information
         :rtype: dict"""
 
-        return {'channel':       self.channel,
-                'fibreDiameter': self.fibreDiameter,
+        return {'fibreDiameter': self.fibreDiameter,
                 'reverse':       self.reverse,
                 'status':        self.status()}
 

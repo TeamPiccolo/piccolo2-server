@@ -6,10 +6,11 @@
 __all__ = ['PiccoloSpectrum','PiccoloSpectrometer']
 
 from PiccoloInstrument import PiccoloInstrument
+from PiccoloWorkerThread import PiccoloWorkerThread
 from collections import MutableMapping
 from datetime import datetime
-import threading
 import time
+import threading
 from Queue import Queue
 import logging
 
@@ -43,7 +44,7 @@ class PiccoloSpectrum(MutableMapping):
     def __len__(self):
         return len(self._meta)
 
-    def setUpwelling(self,value):
+    def setUpwelling(self,value=None):
         if value == None:
             self._meta['Direction'] = 'Upwelling'
         else:
@@ -90,35 +91,28 @@ class PiccoloSpectrum(MutableMapping):
     def getNumberOfPixels(self):
         return len(self.pixels)
 
-class SpectrometerThread(threading.Thread):
+class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
-    def __init__(self,name,spectrometer,busy,tasks,results):
-        assert isinstance(tasks,Queue)
-        assert isinstance(results,Queue)
-        
-        threading.Thread.__init__(self)
-        self.name = name
-        self.daemon = True
 
-        self._log = logging.getLogger('piccolo.worker.spectrometer.{}'.format(name))
-        self._log.info('initialising worker')
-        
-        self._busy = busy
-        self._tQ = tasks
-        self._rQ = results
+    LOGNAME = 'spectrometer'
+
+    def __init__(self,name,spectrometer,busy,tasks,results):
+
+        PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
+
         self._spec = spectrometer
 
     def run(self):
         while True:
             # wait for a new task from the task queue
-            task = self._tQ.get()
+            task = self.tasks.get()
             if task == None:
-                self._log.info('shutting down')
+                self.log.info('shutting down')
                 return
             else:
                 (milliseconds,dark,upwelling) = task
-            self._log.info("start recording for {} milliseconds".format(milliseconds))
-            self._busy.acquire()
+            self.log.info("start recording for {} milliseconds".format(milliseconds))
+            self.busy.acquire()
 
             # create new spectrum instance
             spectrum = PiccoloSpectrum()
@@ -130,16 +124,16 @@ class SpectrometerThread(threading.Thread):
                 time.sleep(milliseconds/1000.)
                 pixels = [1]*100
             else:
-                s.setIntegrationTime(milliseconds)
-                spectrum.update(s.getMetadata())
-                s.requestSpectrum()
-                pixels = s.readSpectrum()
+                self._spec.setIntegrationTime(milliseconds)
+                spectrum.update(self._spec.getMetadata())
+                self._spec.requestSpectrum()
+                pixels = self._spec.readSpectrum()
 
             spectrum.pixels = pixels
 
             # write results to the result queue
-            self._rQ.put(spectrum)
-            self._busy.release()
+            self.results.put(spectrum)
+            self.busy.release()
             
 class PiccoloSpectrometer(PiccoloInstrument):
     def __init__(self,name,spectrometer=None):
