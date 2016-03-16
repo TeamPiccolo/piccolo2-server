@@ -3,18 +3,84 @@
 .. moduleauthor:: Iain Robinson <iain.robinson@ed.ac.uk>
 """
 
-__all__ = ['PiccoloSpectrum','PiccoloSpectrometer']
+__all__ = ['PiccoloSpectraList','PiccoloSpectrum','PiccoloSpectrometer']
 
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloWorkerThread import PiccoloWorkerThread
-from collections import MutableMapping
+from collections import MutableMapping, MutableSequence
 from datetime import datetime
 import time
 import threading
 from Queue import Queue
 import logging
+import json
+import os.path
 
 protectedKeys = ['Direction','Dark','Datetime']
+
+class PiccoloSpectraList(MutableSequence):
+    """a collection of spectra"""
+    def __init__(self,outDir='',seqNr=0, prefix=None):
+        self._spectra = []
+        self._outDir = outDir
+        self._seqNr = seqNr
+        self._prefix=prefix
+
+    def __getitem__(self,i):
+        return self._spectra[i]
+    def __setitem__(self,i,y):
+        assert isinstance(y,PiccoloSpectrum)
+        self._spectra[i] = y
+    def __delitem__(self,i):
+        raise RuntimeError, 'cannot delete spectra'
+    def __len__(self):
+        return len(self._spectra)
+    def insert(self,i,y):
+        assert isinstance(y,PiccoloSpectrum)
+        self._spectra.insert(i,y)
+
+    @property
+    def outName(self):
+        if self._prefix!=None:
+            outp = '{}_'.format(self._prefix)
+        else:
+            outp = ''
+        return '{0}{1:06d}.pico'.format(outp,self._seqNr)
+
+    @property
+    def outPath(self):
+        return os.path.join(self._outDir,self.outName)
+
+    def serialize(self,pretty=True):
+        """serialize to JSON
+
+        :param pretty: when set True (default) produce indented JSON"""
+
+        spectra = []
+        for s in self._spectra:
+            spectra.append({'Metadata':dict(s.items()), 'Pixels':s.pixels})
+        root = {'Spectra':spectra}
+
+        if pretty:
+            return json.dumps(root, sort_keys=True, indent=1)
+        else:
+            return json.dumps(root)
+
+    def write(self,prefix='',clobber=True):
+        """write spectra to file
+
+        :param prefix: output prefix"""
+
+        outDir = os.path.join(prefix,self._outDir)
+        if not os.path.exists(outDir):
+            os.makedirs(outDir)
+
+        fname = os.path.join(outDir,self.outName)
+        if not clobber and os.path.exists(fname):
+            raise RuntimeError, '{} already exists'.format(fname)
+
+        with open(fname,'w') as outf:
+            outf.write(self.serialize())
 
 class PiccoloSpectrum(MutableMapping):
     """An object containing an optical spectrum."""
@@ -118,6 +184,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             spectrum = PiccoloSpectrum()
             spectrum.setDark(dark)
             spectrum.setUpwelling(upwelling)
+            spectrum['name'] = self.name
 
             # record data
             if self._spec==None:
@@ -227,9 +294,13 @@ if __name__ == '__main__':
     time.sleep(0.5)
     for s in specs:
         print s.status()
-        
+
+    spectra = PiccoloSpectraList()
     for s in specs:
         spec = s.getSpectrum()
         print spec.getNumberOfPixels()
+        spectra.append(spec)
+    spectra.write()
+    
+    time.sleep(0.5)
 
-        

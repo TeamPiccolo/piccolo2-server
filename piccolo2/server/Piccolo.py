@@ -8,6 +8,7 @@ __all__ = ['Piccolo']
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloDataDir import PiccoloDataDir
 from PiccoloWorkerThread import PiccoloWorkerThread
+from PiccoloSpectrometer import PiccoloSpectraList
 import socket
 import psutil
 import subprocess
@@ -15,6 +16,7 @@ import datetime
 import threading
 from Queue import Queue
 import time
+import logging
 
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
@@ -27,6 +29,7 @@ class PiccoloThread(PiccoloWorkerThread):
         
         self._shutters = shutters
         self._spectrometers = spectrometers
+        self._outCounter = {}
 
     def _wait(self):
         time.sleep(0.2)
@@ -46,9 +49,14 @@ class PiccoloThread(PiccoloWorkerThread):
             self.log.error('Unexpected command {}'.format(a))
             raise RuntimeError, 'Unexpected command {}'.format(a)
         
+    def getCounter(self,key):
+        if key not in self._outCounter:
+            self._outCounter[key] = 0
+        else:
+            self._outCounter[key] += 1
+        return self._outCounter[key]
 
     def run(self):
-        spectra = []
         while True:
             # wait for a new task from the task queue
             task = self.tasks.get()
@@ -58,22 +66,19 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.log.info('shutting down')
                 return
             elif task == 'abort':
-                if self.busy.locked():
-                    self.results.put(spectra)
-                    self.busy.release()
-                else:
-                    self.log.warn('abort called but not busy')
-                    continue
-            else:
-                (integrationTime,nCycles,delay) = task
+                self.log.warn('abort called but not busy')
+                continue
+            
+            (integrationTime,outDir,nCycles,delay) = task
                 
             # start recording
             self.log.info("start recording {}".format(nCycles))
             self.busy.acquire()
 
             n = 0
+            prefix = '{0:04d}'.format(self.getCounter(outDir))
             while True:
-                spectra = []
+                spectra = PiccoloSpectraList(outDir,n,prefix=prefix)
                 n = n+1
                 if nCycles!='Inf' and n > nCycles:
                     break
@@ -134,14 +139,42 @@ class PiccoloThread(PiccoloWorkerThread):
                 for s in integrationTime['downwelling']:
                     spectra.append(self._spectrometers[s].getSpectrum())
 
+                self.results.put(spectra)
                 self.log.info('finished acquisition {0}/{1}'.format(n,nCycles))
-                self.results.put(spectra)
 
-
-            if len(spectra)>0:
-                self.results.put(spectra)
             self.busy.release()
 
+class PiccoloOutput(threading.Thread):
+    """piccolo writer thread"""
+
+    def __init__(self,name,datadir,spectra,clobber=True,daemon=True):
+        assert isinstance(spectra,Queue)
+        
+        threading.Thread.__init__(self)
+        self.name = name
+        self.daemon = daemon
+
+        self._log = logging.getLogger('piccolo.worker.output.{0}'.format(name))
+        self.log.info('initialising worker')
+
+        self._spectraQ = spectra
+        self._datadir = datadir
+        self._clobber = clobber
+
+    @property
+    def log(self):
+        return self._log
+
+    def run(self):
+        while True:
+            spectra = self._spectraQ.get()
+            if spectra == None:
+                self.log.info('shutting down')
+                return
+
+            self.log.info('writing {} to {}'.format(self._datadir.datadir,spectra.outName))
+            spectra.write(self._datadir.datadir,clobber=self._clobber)
+            
 
 class Piccolo(PiccoloInstrument):
     """piccolo server instrument
@@ -181,6 +214,10 @@ class Piccolo(PiccoloInstrument):
         self._worker = PiccoloThread(name,shutters,spectrometers,self._busy,self._tQ,self._rQ)
         self._worker.start()
 
+        # handling the output thread
+        self._output = PiccoloOutput(name,self._datadir,self._rQ)
+        self._output.start()
+
     def getSpectrometerList(self):
         """get list of attached spectrometers"""
         return self._spectrometers
@@ -213,16 +250,17 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes[shutter][spectrometer]
 
-    def record(self,delay=0.,nCycles=1):
+    def record(self,outDir='spectra',delay=0.,nCycles=1):
         """record spectra
 
+        :param outDir: name of output directory
         :param delay: delay in seconds between each record
         :param nCycles: the number of recording cycles or 'Inf'"""
 
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
-        self._tQ.put((self._integrationTimes,nCycles,delay))
+        self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
         return 'ok'
     
 
