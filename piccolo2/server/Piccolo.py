@@ -14,7 +14,7 @@ import psutil
 import subprocess
 import datetime
 import threading
-from Queue import Queue
+from Queue import Queue, Empty
 import time
 import logging
 
@@ -35,19 +35,14 @@ class PiccoloThread(PiccoloWorkerThread):
         time.sleep(0.2)
 
     def _abort(self):
-        a = 'no'
         try:
-            a = self.task.get(block=False)
-        except:
-            pass
-        if a=='no':
+            a = self.tasks.get(block=False)
+        except Empty:
             return False
-        elif a=='abort':
-            self.log.info('aborted acquisition')
-            return True
-        else:
-            self.log.error('Unexpected command {}'.format(a))
-            raise RuntimeError, 'Unexpected command {}'.format(a)
+
+        self.log.info('aborted acquisition')
+        return True
+
         
     def getCounter(self,key):
         if key not in self._outCounter:
