@@ -23,10 +23,11 @@ class PiccoloThread(PiccoloWorkerThread):
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,shutters,spectrometers,busy,tasks,results):
+    def __init__(self,name,shutters,spectrometers,busy,paused,tasks,results):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
         
+        self._paused = paused
         self._shutters = shutters
         self._spectrometers = spectrometers
         self._outCounter = {}
@@ -34,15 +35,51 @@ class PiccoloThread(PiccoloWorkerThread):
     def _wait(self):
         time.sleep(0.2)
 
-    def _abort(self):
+    def _getCommands(self,block=True):
         try:
-            a = self.tasks.get(block=False)
+            cmd = self.tasks.get(block=block)
         except Empty:
-            return False
+            return
+        
+        self.log.debug(cmd)
 
-        self.log.info('aborted acquisition')
-        return True
+        if cmd == None:
+            self.log.info('shutting down')
+            return 'shutdown'
+        elif cmd == 'abort':
+            if self.busy.locked():
+                self.log.info('aborted acquisition')
+                return 'abort'
+            else:
+                self.log.warn('abort called but not busy')
+                return
+        elif cmd == 'pause':
+            if self._paused.locked():
+                # unpause acquisition
+                self.log.info('unpause acquisition')
+                self._paused.release()
+                return 'unpause'
+            else:
+                # pause acquisition
+                self.log.info('pause acquisition')
+                self._paused.acquire()
+                # wait for a new command
+                while True:
+                    cmd = self._getCommands()
+                    if cmd in ['shutdown','abort']:
+                        self._paused.release()
+                        return cmd
+                    elif cmd == 'unpause':
+                        return
+                    else:
+                        self.log.warn('acquisition paused')
 
+        else:
+            assert len(cmd)==4
+            if self.busy.locked():
+                self.log.warn('already recording data')
+                return
+            return cmd
         
     def getCounter(self,key):
         if key not in self._outCounter:
@@ -54,18 +91,18 @@ class PiccoloThread(PiccoloWorkerThread):
     def run(self):
         while True:
             # wait for a new task from the task queue
-            task = self.tasks.get()
-            self.log.debug(task)
-
+            task = self._getCommands()
             if task == None:
-                self.log.info('shutting down')
-                return
-            elif task == 'abort':
-                self.log.warn('abort called but not busy')
                 continue
-            
-            (integrationTime,outDir,nCycles,delay) = task
-                
+            elif task == 'shutdown':
+                return
+            elif len(task) == 4:
+                # get task
+                (integrationTime,outDir,nCycles,delay) = task
+            else:
+                # nothing interesting, get the next command
+                continue
+
             # start recording
             self.log.info("start recording {}".format(nCycles))
             self.busy.acquire()
@@ -80,8 +117,12 @@ class PiccoloThread(PiccoloWorkerThread):
                 if n>1 and delay>0:
                     self.log.info('waiting for {} seconds'.format(delay))
                     time.sleep(delay)
-                    if self._abort():
+                    # check for abort/shutdown
+                    cmd = self._getCommands(block=False)
+                    if cmd=='abort':
                         break
+                    elif cmd=='shutdown':
+                        return
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
                 self.log.info('Record dark upwelling spectra')
@@ -93,9 +134,12 @@ class PiccoloThread(PiccoloWorkerThread):
                 self._wait()
                 for s in integrationTime['upwelling']:
                     spectra.append(self._spectrometers[s].getSpectrum())
-                # check if we should abort
-                if self._abort():
+                # check for abort/shutdown
+                cmd = self._getCommands(block=False)
+                if cmd=='abort':
                     break
+                elif cmd=='shutdown':
+                    return
 
                 # record upwelling spectra
                 self.log.info('Record upwelling spectra')
@@ -107,9 +151,12 @@ class PiccoloThread(PiccoloWorkerThread):
                 for s in integrationTime['upwelling']:
                     spectra.append(self._spectrometers[s].getSpectrum())
                 self._shutters['upwelling'].closeShutter()
-                # check if we should abort
-                if self._abort():
+                # check for abort/shutdown
+                cmd = self._getCommands(block=False)
+                if cmd=='abort':
                     break
+                elif cmd=='shutdown':
+                    return
 
                 # record downwelling spectra
                 self.log.info('Record downwelling spectra')
@@ -121,9 +168,12 @@ class PiccoloThread(PiccoloWorkerThread):
                 for s in integrationTime['downwelling']:
                     spectra.append(self._spectrometers[s].getSpectrum())
                 self._shutters['downwelling'].closeShutter()
-                # check if we should abort
-                if self._abort():
+                # check for abort/shutdown
+                cmd = self._getCommands(block=False)
+                if cmd=='abort':
                     break
+                elif cmd=='shutdown':
+                    return
 
                 # record downwelling dark spectra
                 self.log.info('Record dark upwelling spectra')
@@ -204,9 +254,10 @@ class Piccolo(PiccoloInstrument):
 
         # handling the worker thread
         self._busy = threading.Lock()
+        self._paused = threading.Lock()
         self._tQ = Queue()
         self._rQ = Queue()
-        self._worker = PiccoloThread(name,shutters,spectrometers,self._busy,self._tQ,self._rQ)
+        self._worker = PiccoloThread(name,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ)
         self._worker.start()
 
         # handling the output thread
@@ -262,15 +313,19 @@ class Piccolo(PiccoloInstrument):
     def abort(self):
         self._tQ.put('abort')
 
+    def pause(self):
+        self._tQ.put('pause')
+
     def status(self):
         """return status of shutter
 
-        :return: *busy* if recording or *idle*"""
+        :return: (busy,paused) 
+        :rtype:  (bool, bool)"""
 
-        if self._busy.locked():
-            return 'busy'
-        else:
-            return 'idle'
+        busy = self._busy.locked()
+        paused = self._paused.locked()
+
+        return (busy,paused)
 
 
     def info(self):
@@ -279,10 +334,19 @@ class Piccolo(PiccoloInstrument):
         :returns: dictionary containing system information
         :rtype: dict"""
         self.log.debug("info")
+
+        status = self.status()
+        if status[0]:
+            s = 'busy'
+        else:
+            s = 'idle'
+        if status[1]:
+            s += ', paused'
+
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
                 'virtual_memory': dict(psutil.virtmem_usage()._asdict()),
-                'status': self.status()}
+                'status': s}
         if self._datadir.isMounted:
             info['datadir'] = self._datadir.datadir
         else:
