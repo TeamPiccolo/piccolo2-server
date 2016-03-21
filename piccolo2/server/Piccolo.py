@@ -17,6 +17,7 @@ import threading
 from Queue import Queue, Empty
 import time
 import logging
+import os.path
 
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
@@ -108,9 +109,10 @@ class PiccoloThread(PiccoloWorkerThread):
             self.busy.acquire()
 
             n = 0
-            prefix = '{0:04d}'.format(self.getCounter(outDir))
+            prefix = os.path.join(outDir,'{0:04d}_'.format(self.getCounter(outDir)))
             while True:
-                spectra = PiccoloSpectraList(outDir,n,prefix=prefix)
+                spectra = PiccoloSpectraList(seqNr=n)
+                spectra.prefix = prefix
                 n = n+1
                 if nCycles!='Inf' and n > nCycles:
                     break
@@ -218,7 +220,7 @@ class PiccoloOutput(threading.Thread):
                 return
 
             self.log.info('writing {} to {}'.format(self._datadir.datadir,spectra.outName))
-            spectra.write(self._datadir.datadir,clobber=self._clobber)
+            spectra.write(prefix=self._datadir.datadir,clobber=self._clobber)
             
 
 class Piccolo(PiccoloInstrument):
