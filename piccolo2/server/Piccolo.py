@@ -327,7 +327,6 @@ class Piccolo(PiccoloInstrument):
 
         return (busy,paused)
 
-
     def info(self):
         """get info
 
@@ -352,6 +351,12 @@ class Piccolo(PiccoloInstrument):
         else:
             info['datadir'] = 'not mounted'
         return info
+
+    def getSpectraList(self,outDir='spectra'):
+        return self._datadir.getFileList(outDir)
+
+    def getSpectra(self,fname=''):
+        return self._datadir.getFileData(fname)
 
     def getClock(self):
         """get the current date and time

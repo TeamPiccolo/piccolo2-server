@@ -6,7 +6,7 @@
 __all__ = ['PiccoloDataDir']
 
 import subprocess
-import os, os.path
+import os, os.path, glob
 import logging
 
 class PiccoloDataDir(object):
@@ -100,6 +100,17 @@ class PiccoloDataDir(object):
             cmdPipe = subprocess.Popen(['sudo','umount',self._device],stderr=subprocess.PIPE)
             if cmdPipe.wait()!=0:
                 raise OSError, 'unmounting {}: {}'.format(self._device, cmdPipe.stderr.read())
+
+    def getFileList(self,path,pattern='*.pico'):
+        p = self.join(path)
+        fileList = []
+        for f in glob.glob(os.path.join(p,pattern)):
+            fileList.append(os.path.relpath(f,self.datadir))
+        fileList.sort()
+        return fileList
+
+    def getFileData(self,fname):
+        return open(self.join(fname),'r').read()
 
     def join(self,p):
         """join path to datadir if path is not absolute
