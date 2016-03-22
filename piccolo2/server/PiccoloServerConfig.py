@@ -60,11 +60,11 @@ class PiccoloServerConfig(object):
         parser.add_argument('-d', '--debug', action='store_true',default=None,help="enable debugging output")
         parser.add_argument('-l', '--log-file',metavar="FILE",help="send piccolo log to FILE, default stdout")
         parser.add_argument('-u','--piccolo-url',metavar='URL',help="set the URL of the piccolo JSON-RPC server, default {}".format(self._cfg['jsonrpc']['url']))
-        
+
         datagroup = parser.add_argument_group('datadir')
         datagroup.add_argument('-o','--data-dir',help="name of data directory, default {}".format(self._cfg['datadir']['datadir']))
         datagroup.add_argument('-m','--mount',default=None,action='store_true',help="mount a device for writing data")
-        
+
         args = parser.parse_args()
 
         if args.server_configuration!=None:
@@ -81,7 +81,7 @@ class PiccoloServerConfig(object):
             self._cfg['datadir']['datadir'] = args.data_dir
         if args.mount != None:
             self._cfg['datadir']['mount'] = args.mount
-        
+
     @property
     def cfg(self):
         return self._cfg
@@ -89,6 +89,4 @@ class PiccoloServerConfig(object):
 if __name__ == '__main__':
 
     cfg = PiccoloServerConfig()
-    print cfg.cfg
-    
-
+    print(cfg.cfg)
