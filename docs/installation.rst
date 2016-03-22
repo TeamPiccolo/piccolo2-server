@@ -34,11 +34,22 @@ Install required Python modules
 
 The Piccolo software requires a number of additional Python modules to be installed on the Raspberry Pi (in addition to those that come with the *Raspbian* operating system).
 
+There are two tools which may be used to install Python modules on the Raspberry Pi:
+
+* apt-get
+* pip
+
 *ConfigObj* is a Python module for reading configuration files, more often known as *ini* files on Windows systems. It is required by the Piccolo software to read the *server configuration file*.
 
 To install *ConfigObj* on the Raspberry Pi, first ensure that a network connection is available, then type::
 
   sudo apt-get install python3-configobj
+
+or::
+
+  sudo apt-get install python-configobj
+
+for Python 2.
 
 To check that *ConfigObj* has been installed, start Python (by typing python3 in a terminal) and try to import the module:
 
@@ -46,17 +57,21 @@ To check that *ConfigObj* has been installed, start Python (by typing python3 in
 
 If no error is reported then *ConfigObj* has been successfully installed.
 
+*Ch
 
 sudo apt-get install python-jsonrpc2
 sudo apt-get install python-jsonrpclib
 
+*CherryPy* is a small web framework for Python. It allows the Piccolo software to use an application programming interface based on popular and standard protocols designed for the world-wide web. *CherryPy* cannot be installed with apt-get because it gives an error (missing encoding module). Instead use pip:
 
-Step 1: Install required modules.
+  sudo apt-get install python-pip
+  sudo pip install cherrypy
 
+*psutil* is Python module that can monitor...something. Type::
 
+  sudo apt-get install python-psutil
 
-Cherrypy is a web framework used by ```piccolo_server```.
-
+(*psutil* cannot be installed on Ubuntu with *pip*. A file called *Python.h* is missing.)
 
 =========================================
 Add *Piccolo Server* to the *Python path*
@@ -73,3 +88,15 @@ Run Piccolo server
 There are a number of different ways to start *Piccolo server*. If *Piccolo server* is not already started, it can run from a terminal by typing::
 
   python3 piccolo-server.py
+
+or
+
+  python piccolo-server.py
+
+This should produce the error message::
+
+  no such configuration file
+
+===========================
+Create a configuraiton file
+===========================
