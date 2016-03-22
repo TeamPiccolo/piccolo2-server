@@ -1,6 +1,21 @@
-====================
-Check Python version
-====================
+Installation
+************
+
+The Piccolo includes a Raspberry Pi which runs *Piccolo Server*. This software controls the Piccolo's hardware (spectrometers, shutters, ...), handles the recording of data, and provides an application programming interface that can be used to control the Piccolo. The Piccolo is usually remotely-controlled from a laptop via a network or radio link.
+
+The Piccolo software is installed on the memory card of the Raspberry Pi that is included with the Piccolo. These instructions are therefore not required for a new instrument. The procedure described here can be used to install the software on a new memory card.
+
+========
+Raspbian
+========
+
+The Raspberry Pi is a miniature computer which runs an operating system, *Raspbian*, which is a variant of Linux.
+
+Download the latest version of *Raspbian* from the Raspberry Pi Foundation and image it onto a memory card.
+
+==============
+Python version
+==============
 
 The Piccolo software is written in Python. Version 3 or later must be installed on both the Raspberry Pi and the laptop.
 
@@ -10,9 +25,9 @@ Python may be installed by default on the Raspberry Pi. To check, type::
 
 in a terminal.
 
-=====================================
-Connect the Raspberry Pi to a network
-=====================================
+==================
+Network connection
+==================
 
 This can be done with a network (Ethernet) cable or a USB wireless adapter. (Neither of these is provided with the Piccolo.)
 
