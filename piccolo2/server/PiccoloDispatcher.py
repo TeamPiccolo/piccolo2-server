@@ -39,6 +39,8 @@ class PiccoloDispatcher(threading.Thread):
 
         self.log.info("initialised")
 
+        self.registerComponent(self._scheduler)
+
     @property
     def log(self):
         """get the logger"""
