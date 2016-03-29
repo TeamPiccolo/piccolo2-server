@@ -34,7 +34,8 @@ datadir = string(default=pdata)
 # set to true to mount a block device (eg a USB stick) for writing data
 mount = boolean(default=False)
 # device to be mounted
-device = string(default=/dev/sda1)
+# Iain Robinson temporarily changed the default device from sda1 to sdb1 for testing.
+device = string(default=/dev/sdb1)
 # the mount point
 mntpnt = string(default=/mnt)
 
