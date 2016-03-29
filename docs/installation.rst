@@ -120,7 +120,7 @@ Create a configuraiton file
 
 The default configuration file can be found in the source code to piccolo.PiccoloConfig.py. Copy and paste this text into the file in the pdata directory: /home/pi/piccolo/pdata.
 
-The shutter channels upwelling and downwelling must be defined. Currently shutters are not implemented, so set the shutter to -1 for all channels.
+The shutter channels upwelling and downwelling must be defined. (Channel names should be case insensitive, so upwelling and Upwelling refer to the same channel.) Currently shutters are not implemented, so set the shutter to -1 for all channels.
 
 ==============
 Piccolo Server
