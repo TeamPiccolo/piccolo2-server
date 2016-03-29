@@ -3,6 +3,8 @@ __all__ = ['PiccoloScheduledJob','PiccoloScheduler']
 import logging
 import datetime
 
+from PiccoloInstrument import PiccoloInstrument
+
 class PiccoloScheduledJob(object):
     """a scheduled job
 
@@ -112,6 +114,24 @@ class PiccoloScheduledJob(object):
         """unsuspend job"""
         self._suspended = suspend        
 
+    @property
+    def as_dict(self):
+        jobDict = {}
+        jobDict['job'] = self._job
+        for k in ['jid','suspended']: #,'at_time','end_time','interval','suspended']:
+            jobDict[k] = getattr(self,k)
+        for k in ['at_time','end_time']:
+            dt = getattr(self,k)
+            if dt!=None:
+                jobDict[k] = dt.strftime("%Y-%m-%dT%H:%M:%S")
+            else:
+                jobDict[k] = ''
+        if self.interval != None:
+            jobDict['interval'] = self.interval.total_seconds()
+        else:
+            jobDict['interval'] = 0
+        return jobDict
+
     def run(self):
         """run the job
 
@@ -136,10 +156,12 @@ class PiccoloScheduledJob(object):
 
         return self._job
 
-class PiccoloScheduler(object):
+class PiccoloScheduler(PiccoloInstrument):
     """the piccolo scheduler holds the scheduled jobs"""
     def __init__(self):
-        self._log = logging.getLogger('piccolo.scheduler')
+
+        PiccoloInstrument.__init__(self,"scheduler")
+        
         self._jobs = []
 
     def add(self,at_time,job,interval=None,end_time=None):
@@ -159,7 +181,12 @@ class PiccoloScheduler(object):
         job = PiccoloScheduledJob(at_time,interval,job,end_time=end_time,jid=jid)
 
         self._jobs.append(job)
-        self._jobs.sort()
+
+    def njobs(self):
+        return len(self._jobs)
+
+    def getJob(self,jid=0):
+        return self._getJob(jid=jid).as_dict
 
     @property
     def runable_jobs(self):
@@ -172,23 +199,33 @@ class PiccoloScheduler(object):
         for job in self._jobs:
             yield job
 
+    def _getJob(self,jid):
+        for job in self._jobs:
+            if job.jid == jid:
+                return job
+        raise LookupError, 'unknown jid {0}'.format(jid)
+
     def _suspend(self,jid,state):
         """suspend or unsuspend particular job"""
 
-        for job in self._jobs:
-            if job.jid == jid:
-                job.suspend(suspend=state)
-                return
-        raise LookupError, 'unknown jid {0}'.format(jid)
+        self._getJob(jid).suspend(suspend=state)
 
-    def suspend(self,jid):
+    def suspended(self,jid=0):
+        """check if job is suspended
+
+        :param jid: id of job to suspend
+        :type jid: int"""
+
+        return self._getJob(jid).suspended
+
+    def suspend(self,jid=0):
         """suspend job
         
         :param jid: id of job to suspend
         :type jid: int"""
         self._suspend(jid,True)
 
-    def unsuspend(self,jid):
+    def unsuspend(self,jid=0):
         """unsuspend job
         
         :param jid: id of job to unsuspend
