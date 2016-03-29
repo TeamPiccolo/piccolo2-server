@@ -12,7 +12,7 @@ if __name__ == '__main__':
                            debug=serverCfg.cfg['logging']['debug'])
 
     log = logging.getLogger("piccolo.server")
-    
+
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
                                    device=serverCfg.cfg['datadir']['device'],
@@ -39,13 +39,13 @@ if __name__ == '__main__':
         if piccoloCfg.cfg['channels'][c]['shutter'] == -1:
             shutter = None
         else:
-            raise NotImplementedError
+            raise NotImplementedError('Shutter supported not implemented. Set the shutter numbers to be -1 in the Piccolo server configuration file.')
         shutters[c] = piccolo.PiccoloShutter(c, shutter=shutter,
                                              reverse=piccoloCfg.cfg['channels'][c]['reverse'],
                                              fibreDiameter=piccoloCfg.cfg['channels'][c]['fibreDiameter'])
     for c in shutters:
         pd.registerComponent(shutters[c])
-    
+
     # initialise the spectrometers
     spectrometers = {}
     for sname in piccoloCfg.cfg['spectrometers']:
@@ -71,5 +71,3 @@ if __name__ == '__main__':
                             'server.socket_port':serverUrl.port})
 
     cherrypy.quickstart(pController)
-
-

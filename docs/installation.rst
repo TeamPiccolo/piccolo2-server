@@ -11,7 +11,9 @@ Raspbian
 
 The Raspberry Pi is a miniature computer which runs an operating system, *Raspbian*, which is a variant of Linux.
 
-Download the latest version of *Raspbian* from the Raspberry Pi Foundation and image it onto a memory card.
+*Raspbian* can be obtained from the `downloads page <https://www.raspberrypi.org/downloads>`_ at the `Raspberry Pi Foundation <https://www.raspberrypi.org/>`_. At the time of writing, the latest version is *Raspbian Jessie*, released on 18th March 2016. (*Raspbian Jessie Lite* has not been tested with the Piccolo.)
+
+Download the zip (or Torrent) file and follow the Foundation's instructions to image it onto a memory (SD) card.
 
 ==============
 Python version
@@ -115,3 +117,24 @@ This should produce the error message::
 ===========================
 Create a configuraiton file
 ===========================
+
+The default configuration file can be found in the source code to piccolo.PiccoloConfig.py. Copy and paste this text into the file in the pdata directory: /home/pi/piccolo/pdata.
+
+The shutter channels upwelling and downwelling must be defined. Currently shutters are not implemented, so set the shutter to -1 for all channels.
+
+==============
+Piccolo Server
+==============
+
+Once the configuration file is in place, Piccolo server can be started::
+
+  python piccolo-server.py
+
+A number of messages should appear, including::
+
+  Serving on http://localhost:8080
+  Bus STARTED
+
+This final message indicates that *Piccolo Server* is running, and that the address to which commands should be sent is (the default)::
+
+  http://localhost:8080
