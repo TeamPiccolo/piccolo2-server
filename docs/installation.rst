@@ -13,7 +13,7 @@ The Raspberry Pi is a miniature computer which runs an operating system, *Raspbi
 
 *Raspbian* can be obtained from the `downloads page <https://www.raspberrypi.org/downloads>`_ at the `Raspberry Pi Foundation <https://www.raspberrypi.org/>`_. At the time of writing, the latest version is *Raspbian Jessie*, released on 18th March 2016. (*Raspbian Jessie Lite* has not been tested with the Piccolo.)
 
-Download the zip (or Torrent) file and follow the Foundation's instructions to image it onto a memory (SD) card.
+Download the zip (or Torrent) file and follow `their instructions <https://www.raspberrypi.org/documentation/installation/installing-images/README.md>` instructions to image it onto a memory (SD) card.
 
 ==============
 Python version
