@@ -19,13 +19,7 @@ Download the zip (or Torrent) file and follow the Foundation's instructions to i
 Python version
 ==============
 
-The Piccolo software is written in Python. Version 3 or later must be installed on both the Raspberry Pi and the laptop.
-
-Python may be installed by default on the Raspberry Pi. To check, type::
-
-  python3
-
-in a terminal.
+The Piccolo software is written in Python. Piccolo Server can be run in Python 2.
 
 ==================
 Network connection
