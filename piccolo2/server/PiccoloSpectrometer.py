@@ -103,8 +103,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         return {'serial' : self._serial,
                 'nSpectra' : self.numSpectra(),
-                'info' : self.info(),
-                'status' : self.status}
+                'status' : self.status()}
 
     def acquire(self,milliseconds=100,dark=False,upwelling=False):
         """start recording a spectrum

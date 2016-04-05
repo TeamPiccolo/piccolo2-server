@@ -13,6 +13,7 @@ except:
 
 if HAVE_PICCOLO_DRIVER:
     from piccolo_drivers import shutters as piccolo_shutters
+    from piccolo_drivers import spectrometers as piccolo_spectrometers
     
 if __name__ == '__main__':
     serverCfg = piccolo.PiccoloServerConfig()
@@ -60,8 +61,15 @@ if __name__ == '__main__':
 
     # initialise the spectrometers
     spectrometers = {}
-    for sname in piccoloCfg.cfg['spectrometers']:
-        spectrometers[sname] = piccolo.PiccoloSpectrometer(sname)
+    if HAVE_PICCOLO_DRIVER:
+        for s in piccolo_spectrometers.getConnectedSpectrometers():
+            #strip out all non-alphanumeric characters
+            sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
+            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
+    else:
+        for sn in piccoloCfg.cfg['spectrometers']:
+            sname = 'S_'+sn
+            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname)
     for sname in spectrometers:
         pd.registerComponent(spectrometers[sname])
 
