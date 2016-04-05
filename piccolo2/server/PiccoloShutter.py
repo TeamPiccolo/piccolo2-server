@@ -37,19 +37,16 @@ class PiccoloShutter(PiccoloInstrument):
         """
 
         PiccoloInstrument.__init__(self,name)
-
+        self._lock = threading.Lock()
+        
         self._fibre = float(fibreDiameter)
         self._reverse = reverse
 
         self._shutter = shutter
         if self._shutter!=None:
-            # TODO: initialise shutter
-            # self._shutter = SOMETHING
             self.openShutter()
             time.sleep(1)
             self.closeShutter()
-
-        self._lock = threading.Lock()
 
     @property
     def reverse(self):

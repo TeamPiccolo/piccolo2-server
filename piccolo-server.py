@@ -5,6 +5,15 @@ import urlparse
 import sys
 import logging
 
+HAVE_PICCOLO_DRIVER = True
+try:
+    import piccolo_drivers
+except:
+    HAVE_PICCOLO_DRIVER = False
+
+if HAVE_PICCOLO_DRIVER:
+    from piccolo_drivers import shutters as piccolo_shutters
+    
 if __name__ == '__main__':
     serverCfg = piccolo.PiccoloServerConfig()
 
@@ -39,7 +48,10 @@ if __name__ == '__main__':
         if piccoloCfg.cfg['channels'][c]['shutter'] == -1:
             shutter = None
         else:
-            raise NotImplementedError('Shutter supported not implemented. Set the shutter numbers to be -1 in the Piccolo server configuration file.')
+            if not HAVE_PICCOLO_DRIVER:
+                log.error('piccolo low-level drivers are not available')
+                sys.exit(1)
+            shutter = piccolo_shutters.Shutter(getattr(piccolo_shutters,'SHUTTER_%d'%piccoloCfg.cfg['channels'][c]['shutter']))
         shutters[c] = piccolo.PiccoloShutter(c, shutter=shutter,
                                              reverse=piccoloCfg.cfg['channels'][c]['reverse'],
                                              fibreDiameter=piccoloCfg.cfg['channels'][c]['fibreDiameter'])
