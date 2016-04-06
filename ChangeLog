@@ -1,4 +1,8 @@
 2016-04-06 Magnus Hagdorn
+ * README.md: updated
+ * setup.py: add metadata
+
+2016-04-06 Magnus Hagdorn
  * started ChangeLog
  * use setuptools
  * piccolo-server.py moved to piccolo2/pserver.py

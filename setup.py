@@ -16,4 +16,10 @@ setup(
             'piccolo2-server = piccolo2.pserver:main',
         ],
     },
+
+    # metadata for upload to PyPI
+    author = "Magnus Hagdorn, Alasdair MacArthur, Iain Robinson",
+    description = "Part of the piccolo2 system. This package provides the piccolo2 server",
+    license = "GPL",
+    url = "https://bitbucket.org/uoepiccolo/piccolo2-server",
 )
