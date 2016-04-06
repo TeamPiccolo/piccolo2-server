@@ -1,0 +1,6 @@
+2016-04-06 Magnus Hagdorn
+ * started ChangeLog
+ * use setuptools
+ * piccolo-server.py moved to piccolo2/pserver.py
+ * requirements.txt: removed, now part of setup.py
+ * piccolo2/server/PiccoloSpectrometer.py: fix import of common module

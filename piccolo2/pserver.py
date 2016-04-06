@@ -1,4 +1,4 @@
-import piccolo_server as piccolo
+import server as piccolo
 import cherrypy
 import argparse
 import urlparse
@@ -15,7 +15,7 @@ if HAVE_PICCOLO_DRIVER:
     from piccolo_drivers import shutters as piccolo_shutters
     from piccolo_drivers import spectrometers as piccolo_spectrometers
     
-if __name__ == '__main__':
+def main():
     serverCfg = piccolo.PiccoloServerConfig()
 
     piccolo.piccoloLogging(logfile=serverCfg.cfg['logging']['logfile'],
@@ -91,3 +91,6 @@ if __name__ == '__main__':
                             'server.socket_port':serverUrl.port})
 
     cherrypy.quickstart(pController)
+
+if __name__ == '__main__':
+    main()

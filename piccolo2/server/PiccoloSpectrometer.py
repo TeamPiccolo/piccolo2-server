@@ -5,7 +5,7 @@
 
 __all__ = ['PiccoloSpectrometer']
 
-from piccolo_common import PiccoloSpectraList, PiccoloSpectrum
+from piccolo2.PiccoloSpectra import *
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloWorkerThread import PiccoloWorkerThread
 import time
