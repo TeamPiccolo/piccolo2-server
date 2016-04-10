@@ -14,7 +14,7 @@ except:
 if HAVE_PICCOLO_DRIVER:
     from piccolo_drivers import shutters as piccolo_shutters
     from piccolo_drivers import spectrometers as piccolo_spectrometers
-    
+
 def main():
     serverCfg = piccolo.PiccoloServerConfig()
 
@@ -29,7 +29,10 @@ def main():
                                    mntpnt=serverCfg.cfg['datadir']['mntpnt'],
                                    mount=serverCfg.cfg['datadir']['mount'])
 
-    # start the dispatcher
+    # Initialize the dispatcher object (pd). The dispatcher is started later.
+    #
+    # Setting daemon to True ensures that it is properly terminated if Piccolo
+    # Server is shut down.
     pd = piccolo.PiccoloDispatcher(daemon=True)
 
     # read the piccolo configuration
