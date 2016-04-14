@@ -7,13 +7,13 @@ import logging
 
 HAVE_PICCOLO_DRIVER = True
 try:
-    import piccolo_drivers
+    import piccolo2.hardware
 except:
     HAVE_PICCOLO_DRIVER = False
 
 if HAVE_PICCOLO_DRIVER:
-    from piccolo_drivers import shutters as piccolo_shutters
-    from piccolo_drivers import spectrometers as piccolo_spectrometers
+    from piccolo2.hardware import shutters as piccolo_shutters
+    from piccolo2.hardware import spectrometers as piccolo_spectrometers
 
 def main():
     serverCfg = piccolo.PiccoloServerConfig()

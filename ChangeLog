@@ -1,3 +1,6 @@
+2016-04-14 Magnus Hagdorn
+ * piccolo2/pserver.py: use new hardware module
+
 2016-04-06 Magnus Hagdorn
  * README.md: updated
  * setup.py: add metadata
