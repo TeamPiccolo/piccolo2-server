@@ -24,3 +24,5 @@ def piccoloLogging(logfile = None,debug=False):
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(name)s: %(message)s')
     handler.setFormatter(formatter)
     log.addHandler(handler)
+
+    return handler

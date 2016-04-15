@@ -9,7 +9,9 @@ setup(
         "piccolo2-common",
         "python-jsonrpc",
         "psutil",
-        "CherryPy > 5"
+        "CherryPy > 5",
+        "python-daemon",
+        "lockfile >= 0.9",
     ],
     entry_points={
         'console_scripts': [

@@ -4,6 +4,7 @@ import argparse
 import urlparse
 import sys
 import logging
+import os
 
 HAVE_PICCOLO_DRIVER = True
 try:
@@ -14,14 +15,8 @@ except:
 if HAVE_PICCOLO_DRIVER:
     from piccolo2.hardware import shutters as piccolo_shutters
     from piccolo2.hardware import spectrometers as piccolo_spectrometers
-
-def main():
-    serverCfg = piccolo.PiccoloServerConfig()
-
-    piccolo.piccoloLogging(logfile=serverCfg.cfg['logging']['logfile'],
-                           debug=serverCfg.cfg['logging']['debug'])
-
-    log = logging.getLogger("piccolo.server")
+    
+def piccolo_server(serverCfg):
 
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
@@ -80,8 +75,6 @@ def main():
     pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers)
     pd.registerComponent(pc)
 
-
-
     pController = piccolo.PiccoloControllerCherryPy()
 
     pd.registerController(pController)
@@ -95,5 +88,39 @@ def main():
 
     cherrypy.quickstart(pController)
 
+def main():
+    serverCfg = piccolo.PiccoloServerConfig()
+
+    # start logging
+    handler = piccolo.piccoloLogging(logfile=serverCfg.cfg['logging']['logfile'],
+                                     debug=serverCfg.cfg['logging']['debug'])
+    log = logging.getLogger("piccolo.server")
+
+    
+    if serverCfg.cfg['daemon']['daemon']:
+        import daemon
+        from lockfile.pidlockfile import PIDLockFile
+        from lockfile import AlreadyLocked
+
+        # create a pid file and tidy up if required
+        pidfile = PIDLockFile(serverCfg.cfg['daemon']['pid_file'], timeout=-1)
+        try:
+            pidfile.acquire()
+        except AlreadyLocked:
+            try:
+                os.kill(pidfile.read_pid(), 0)
+                print 'Process already running!'
+                exit(1)
+            except OSError:  #No process with locked PID
+                pidfile.break_lock()
+        
+        with daemon.DaemonContext(pidfile=pidfile,
+                                  files_preserve = [ handler.stream ] ):
+            # start piccolo
+            piccolo_server(serverCfg)
+    else:
+        # start piccolo
+        piccolo_server(serverCfg)
+    
 if __name__ == '__main__':
     main()

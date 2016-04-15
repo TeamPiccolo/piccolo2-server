@@ -1,3 +1,10 @@
+2016-04-15 Magnus Hagdorn
+ * piccolo2/pserver.py: add option to daemonize server
+ * piccolo2/server/PiccoloServerConfig.py: new configuration options to
+   daemonize server
+ * piccolo2/server/piccoloLogging.py: return log handler
+ * setup.py: require some more packages
+
 2016-04-14 Magnus Hagdorn
  * piccolo2/pserver.py: use new hardware module
 

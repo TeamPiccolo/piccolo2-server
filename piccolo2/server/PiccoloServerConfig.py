@@ -26,6 +26,12 @@ debug = boolean(default=False)
 # log to logfile if set otherwise log to stdout
 logfile = string(default=None)
 
+[daemon]
+# run piccolo server as daemon
+daemon = boolean(default=False)
+# name of PID file
+pid_file = string(default=/var/run/piccolo.pid)
+
 [datadir]
 # control location of output files
 # if datadir is a relative path (ie it does not start with a /) write to PWD or
@@ -60,8 +66,13 @@ class PiccoloServerConfig(object):
         parser.add_argument('-s','--server-configuration',metavar='CFG',help="read configuration from CFG")
         parser.add_argument('-d', '--debug', action='store_true',default=None,help="enable debugging output")
         parser.add_argument('-l', '--log-file',metavar="FILE",help="send piccolo log to FILE, default stdout")
+
         parser.add_argument('-u','--piccolo-url',metavar='URL',help="set the URL of the piccolo JSON-RPC server, default {}".format(self._cfg['jsonrpc']['url']))
 
+        daemongroup = parser.add_argument_group('daemon')
+        daemongroup.add_argument('-D','--daemonize',default=None,action='store_true',help="start piccolo server as daemon")
+        daemongroup.add_argument('-p','--pid-file',default=None,help="name of the PID file")
+        
         datagroup = parser.add_argument_group('datadir')
         datagroup.add_argument('-o','--data-dir',help="name of data directory, default {}".format(self._cfg['datadir']['datadir']))
         datagroup.add_argument('-m','--mount',default=None,action='store_true',help="mount a device for writing data")
@@ -76,6 +87,12 @@ class PiccoloServerConfig(object):
             self._cfg['logging']['debug'] = args.debug
         if args.log_file != None:
             self._cfg['logging']['logfile'] = args.log_file
+
+        if args.daemonize != None:
+            self._cfg['daemon']['daemon'] = args.daemonize
+        if args.pid_file != None:
+            self._cfg['daemon']['pid_file'] = args.pid_file
+            
         if args.piccolo_url != None:
             self._cfg['jsonrpc']['url'] = args.piccolo_url
         if args.data_dir != None:
