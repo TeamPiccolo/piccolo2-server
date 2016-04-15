@@ -1,4 +1,10 @@
 2016-04-15 Magnus Hagdorn
+ * setup.py: package data file
+ * MANIFEST.in: list data files
+ * etc/piccolo.cfg: example server configuration
+ * etc/piccolo2: init script
+
+2016-04-15 Magnus Hagdorn
  * piccolo2/pserver.py: add option to daemonize server
  * piccolo2/server/PiccoloServerConfig.py: new configuration options to
    daemonize server
