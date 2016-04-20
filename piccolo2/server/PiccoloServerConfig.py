@@ -49,6 +49,9 @@ mntpnt = string(default=/mnt)
 # The URL on which the piccolo JSON-RPC server is listening. By default listen
 # on http://localhost:8080
 url = string(default="http://localhost:8080")
+# file based logging is only used when daemonized
+access_log = string(default="/var/log/piccolo.access")
+error_log = string(default="/var/log/piccolo.error")
 """
 
 # populate the default server config object which is used as a validator

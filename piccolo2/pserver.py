@@ -18,6 +18,8 @@ if HAVE_PICCOLO_DRIVER:
     
 def piccolo_server(serverCfg):
 
+    log = logging.getLogger("piccolo.server")
+
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
                                    device=serverCfg.cfg['datadir']['device'],
@@ -85,6 +87,11 @@ def piccolo_server(serverCfg):
     serverUrl = urlparse.urlparse(serverCfg.cfg['jsonrpc']['url'])
     cherrypy.config.update({'server.socket_host':serverUrl.hostname,
                             'server.socket_port':serverUrl.port})
+    # redirect log if daemonized
+    if serverCfg.cfg['daemon']['daemon']:
+        cherrypy.config.update({'log.screen': False,
+                                'log.access_file': serverCfg.cfg['jsonrpc']['access_log'],
+                                'log.error_file':  serverCfg.cfg['jsonrpc']['error_log']})
 
     cherrypy.quickstart(pController)
 
@@ -100,7 +107,7 @@ def main():
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
         from lockfile.pidlockfile import PIDLockFile
-        from lockfile import AlreadyLocked
+        from lockfile import AlreadyLocked, NotLocked
 
         # create a pid file and tidy up if required
         pidfile = PIDLockFile(serverCfg.cfg['daemon']['pid_file'], timeout=-1)
@@ -112,10 +119,17 @@ def main():
                 print 'Process already running!'
                 exit(1)
             except OSError:  #No process with locked PID
+                print 'PID file exists but process is dead'
                 pidfile.break_lock()
-        
+        try:
+            pidfile.release()
+        except NotLocked:
+            pass
+
+        pstd = open('/var/log/piccolo.err','w')
         with daemon.DaemonContext(pidfile=pidfile,
-                                  files_preserve = [ handler.stream ] ):
+                                  files_preserve = [ handler.stream ],
+                                  stderr=pstd):
             # start piccolo
             piccolo_server(serverCfg)
     else:

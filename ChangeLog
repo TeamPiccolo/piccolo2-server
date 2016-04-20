@@ -1,3 +1,9 @@
+2016-04-20 Magnus Hagdorn
+ * piccolo2/pserver.py: make pid file work, redirect stderr,
+   log cherrypy to file when run as daemon
+ * piccolo2/server/PiccoloServerConfig.py: add config option to set cherrypy
+   log files
+
 2016-04-15 Magnus Hagdorn
  * setup.py: package data file
  * MANIFEST.in: list data files
