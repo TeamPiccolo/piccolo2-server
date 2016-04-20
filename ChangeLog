@@ -1,4 +1,7 @@
 2016-04-20 Magnus Hagdorn
+ * piccolo2/pserver.py: use simulated spectrometers if none are found
+
+2016-04-20 Magnus Hagdorn
  * piccolo2/pserver.py: make pid file work, redirect stderr,
    log cherrypy to file when run as daemon
  * piccolo2/server/PiccoloServerConfig.py: add config option to set cherrypy

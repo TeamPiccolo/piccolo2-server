@@ -63,13 +63,18 @@ def piccolo_server(serverCfg):
     spectrometers = {}
     if HAVE_PICCOLO_DRIVER:
         for s in piccolo_spectrometers.getConnectedSpectrometers():
+            
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
-    else:
+    if len(spectrometers) == 0:
         for sn in piccoloCfg.cfg['spectrometers']:
             sname = 'S_'+sn
-            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname)
+            if HAVE_PICCOLO_DRIVER:
+                s = piccolo_spectrometers.SimulatedOceanOpticsSpectrometer(sn)
+            else:
+                s = None
+            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
     for sname in spectrometers:
         pd.registerComponent(spectrometers[sname])
 
