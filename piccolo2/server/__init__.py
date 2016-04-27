@@ -5,6 +5,7 @@ from PiccoloDataDir import *
 from PiccoloDispatcher import *
 from PiccoloController import *
 from PiccoloControllerCherryPy import *
+from PiccoloControllerXbee import *
 
 # the instruments
 from Piccolo import *

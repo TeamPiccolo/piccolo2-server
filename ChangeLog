@@ -1,3 +1,8 @@
+2016-04-27 Magnus Hagdorn
+ * piccolo2/pserver.py: hook up xbee controller, temporarily disable jsonrpc controller
+ * piccolo2/server/__init__.py: load xbee controller
+ * piccolo2/server/PiccoloControllerXbee.py: add xbee controller
+
 2016-04-20 Magnus Hagdorn
  * piccolo2/pserver.py: use simulated spectrometers if none are found
 
