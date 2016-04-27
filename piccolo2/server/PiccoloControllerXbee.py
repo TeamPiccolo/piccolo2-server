@@ -15,7 +15,7 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
 
     def __init__(self,busy,tasks,results,panid='2525'):
 
-        PiccoloWorkerThread.__init__(self,'xbee',busy,tasks,results,daemon=False)
+        PiccoloWorkerThread.__init__(self,'xbee',busy,tasks,results)
         self._rd = radio.APIModeRadio(panId=panid)
         
     def run(self):

@@ -1,4 +1,8 @@
 2016-04-27 Magnus Hagdorn
+ * piccolo2/pserver.py: re-enable JSON RPC server
+ * piccolo2/server/PiccoloControllerXbee.py: run as daemon thread
+
+2016-04-27 Magnus Hagdorn
  * piccolo2/server/PiccoloControllerXbee.py: use new block read/write xbee 
    radio methods
 

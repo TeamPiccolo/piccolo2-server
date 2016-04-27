@@ -82,25 +82,30 @@ def piccolo_server(serverCfg):
     pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers)
     pd.registerComponent(pc)
 
-    #pController = piccolo.PiccoloControllerCherryPy()
-    pController = piccolo.PiccoloControllerXbee()
+    pJSONController = piccolo.PiccoloControllerCherryPy()
+    pd.registerController(pJSONController)
 
-    pd.registerController(pController)
+    pXBEEController = None
+    try:
+        pXBEEController = piccolo.PiccoloControllerXbee()
+    except:
+        log.warn('cannot initialise xbee controller')
+    if pXBEEController!=None:
+        pd.registerController(pXBEEController)
 
     pd.start()
 
-    if False:
-        # start the webservice
-        serverUrl = urlparse.urlparse(serverCfg.cfg['jsonrpc']['url'])
-        cherrypy.config.update({'server.socket_host':serverUrl.hostname,
+    # start the webservice
+    serverUrl = urlparse.urlparse(serverCfg.cfg['jsonrpc']['url'])
+    cherrypy.config.update({'server.socket_host':serverUrl.hostname,
                                 'server.socket_port':serverUrl.port})
-        # redirect log if daemonized
-        if serverCfg.cfg['daemon']['daemon']:
-            cherrypy.config.update({'log.screen': False,
-                                    'log.access_file': serverCfg.cfg['jsonrpc']['access_log'],
-                                    'log.error_file':  serverCfg.cfg['jsonrpc']['error_log']})
+    # redirect log if daemonized
+    if serverCfg.cfg['daemon']['daemon']:
+        cherrypy.config.update({'log.screen': False,
+                                'log.access_file': serverCfg.cfg['jsonrpc']['access_log'],
+                                'log.error_file':  serverCfg.cfg['jsonrpc']['error_log']})
 
-        cherrypy.quickstart(pController)
+    cherrypy.quickstart(pJSONController)
 
 def main():
     serverCfg = piccolo.PiccoloServerConfig()
