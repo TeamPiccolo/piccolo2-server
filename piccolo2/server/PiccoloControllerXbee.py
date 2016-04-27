@@ -20,30 +20,18 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
         
     def run(self):
         while True:
-            data = ''
-            d = 'nok'
-            while d != 'ok':
-                d = self._rd.readline()
-                time.sleep(0.1)
-                if d=='ok':
-                    break
-                data += d
+            data = self._rd.readBlock()
+
+            self.log.debug('got command %s'%data)
             snr,command,component,keywords = json.loads(data)
             snr = str(snr)
-            self.log.debug('got command %s'%d)
 
             self.tasks.put((command,component,keywords))
 
             res = json.dumps(self.results.get())
-            l = len(res)
-            n = l//self.CHUNK+1
-            for i in range(0,n):
-                s = i*self.CHUNK
-                e = min((i+1)*self.CHUNK,l)
-                self.log.debug('write results (%d) %d/%d'%(e-s,i+1,n))
-                self._rd.writeline(res[s:e],snr)
-                time.sleep(0.1)
-            self._rd.writeline('ok',snr)
+
+            self._rd.writeBlock(res,snr)
+
             self.log.debug('done')
             
 
