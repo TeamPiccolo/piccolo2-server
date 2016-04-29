@@ -76,7 +76,7 @@ class PiccoloDispatcher(threading.Thread):
         :param kwds: dictionary containing command parameters
         :returns: result of running command"""
 
-        self.log.debug('invoke {0} {1}'.format(component,command))
+        self.log.debug('invoke {0} {1} {2}'.format(component,command,str(kwds)))
 
         if component not in self._components:
             raise KeyError, 'unkown component {0}'.format(component)

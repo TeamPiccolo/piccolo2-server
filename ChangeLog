@@ -1,3 +1,7 @@
+2016-04-29 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: cache spectra to be sent when sending chunks
+ * piccolo2/server/PiccoloDispatcher.py: also report keywords in debug messages
+
 2016-04-27 Magnus Hagdorn
  * piccolo2/pserver.py: re-enable JSON RPC server
  * piccolo2/server/PiccoloControllerXbee.py: run as daemon thread

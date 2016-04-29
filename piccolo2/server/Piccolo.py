@@ -241,6 +241,8 @@ class Piccolo(PiccoloInstrument):
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
         self._datadir = datadir
+        
+        self._spectraCache = (None,None)
 
         self._spectrometers = spectrometers.keys()
         self._spectrometers.sort()
@@ -357,8 +359,13 @@ class Piccolo(PiccoloInstrument):
     def getSpectraList(self,outDir='spectra'):
         return self._datadir.getFileList(outDir)
 
-    def getSpectra(self,fname=''):
-        return self._datadir.getFileData(fname)
+    def getSpectra(self,fname='',chunk=None):
+        if chunk == None:
+            return self._datadir.getFileData(fname)
+        else:
+            if fname != self._spectraCache[0]:
+                self._spectraCache = (fname,PiccoloSpectraList(data=self._datadir.getFileData(fname)))
+            return self._spectraCache[1].getChunk(chunk)
 
     def getClock(self):
         """get the current date and time
