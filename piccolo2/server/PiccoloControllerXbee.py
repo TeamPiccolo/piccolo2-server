@@ -20,7 +20,12 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
         
     def run(self):
         while True:
-            data = self._rd.readBlock()
+            try:
+                data = self._rd.readBlock(timeoutInSeconds=10)
+            except radio.TimeoutError:
+                # ignore timeouts, just try again
+                # this helps if a client disappears during transmission
+                continue
 
             self.log.debug('got command %s'%data)
             snr,command,component,keywords = json.loads(data)

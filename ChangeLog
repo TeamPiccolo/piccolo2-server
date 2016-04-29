@@ -1,4 +1,7 @@
 2016-04-29 Magnus Hagdorn
+ * piccolo2/server/PiccoloControllerXbee.py: add a read timeout
+
+2016-04-29 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: cache spectra to be sent when sending chunks
  * piccolo2/server/PiccoloDispatcher.py: also report keywords in debug messages
 
