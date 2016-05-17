@@ -365,7 +365,6 @@ class Piccolo(PiccoloInstrument):
 
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
-                'virtual_memory': dict(psutil.virtmem_usage()._asdict()),
                 'status': s}
         if self._datadir.isMounted:
             info['datadir'] = self._datadir.datadir

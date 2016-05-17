@@ -1,4 +1,8 @@
 2016-05-17 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: take out virtual memory info as not available
+   on pi
+
+2016-05-17 Magnus Hagdorn
  * MANIFEST.in: distribute docs
 
 2016-04-29 Magnus Hagdorn
