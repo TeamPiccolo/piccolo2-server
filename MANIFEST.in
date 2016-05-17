@@ -1,2 +1,8 @@
 include etc/piccolo.cfg
 include etc/piccolo2
+include pdata/piccolo.config
+include README.md
+include COPYING
+include ChangeLog
+recursive-include docs *.rst *.py Makefile 
+recursive-include docs/images *
