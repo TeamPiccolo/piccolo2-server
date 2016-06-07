@@ -26,7 +26,7 @@ LOG=/var/log/piccolo.log
 CFG=/etc/piccolo.cfg
 
 do_start () {
-log_daemon_msg "Starting Piccolo Conductor..."
+log_daemon_msg "Starting Piccolo Server..."
 if [ -e $PICCOLO ]
 then
         $PICCOLO -l $LOG -s $CFG -D -p $PIDFILE
