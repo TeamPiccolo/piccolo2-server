@@ -32,7 +32,7 @@ except:
 if HAVE_PICCOLO_DRIVER:
     from piccolo2.hardware import shutters as piccolo_shutters
     from piccolo2.hardware import spectrometers as piccolo_spectrometers
-    
+
 def piccolo_server(serverCfg):
 
     log = logging.getLogger("piccolo.server")
@@ -80,7 +80,7 @@ def piccolo_server(serverCfg):
     spectrometers = {}
     if HAVE_PICCOLO_DRIVER:
         for s in piccolo_spectrometers.getConnectedSpectrometers():
-            
+
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
@@ -105,8 +105,9 @@ def piccolo_server(serverCfg):
     pXBEEController = None
     try:
         pXBEEController = piccolo.PiccoloControllerXbee()
-    except:
-        log.warn('cannot initialise xbee controller')
+    except Exception as e:
+        log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
+        raise
     if pXBEEController!=None:
         pd.registerController(pXBEEController)
 
@@ -132,7 +133,7 @@ def main():
                                      debug=serverCfg.cfg['logging']['debug'])
     log = logging.getLogger("piccolo.server")
 
-    
+
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
         from lockfile.pidlockfile import PIDLockFile
@@ -164,6 +165,6 @@ def main():
     else:
         # start piccolo
         piccolo_server(serverCfg)
-    
+
 if __name__ == '__main__':
     main()
