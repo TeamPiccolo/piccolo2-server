@@ -19,7 +19,11 @@ __all__ = ['PiccoloControllerXbee']
 
 from PiccoloController import PiccoloController
 from PiccoloWorkerThread import PiccoloWorkerThread
-from piccolo2.hardware import radio
+haveRadio=True
+try:
+    from piccolo2.hardware import radio
+except:
+    haveRadio=False
 import json
 import Queue
 import threading
@@ -33,10 +37,16 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
     def __init__(self,busy,tasks,results,panid='2525'):
 
         PiccoloWorkerThread.__init__(self,'xbee',busy,tasks,results)
-        self._rd = radio.APIModeRadio(panId=panid)
-        self.log.info('xbee serial number %s'%self._rd.getSerialNumber())
+        if haveRadio:
+            self._rd = radio.APIModeRadio(panId=panid)
+            self.log.info('xbee serial number %s'%self._rd.getSerialNumber())
+        else:
+            self._rd = None
+            self.log.warning('radio module not availalbe')
         
     def run(self):
+        if self._rd == None:
+            return
         while True:
             try:
                 data = self._rd.readBlock(timeoutInSeconds=10)

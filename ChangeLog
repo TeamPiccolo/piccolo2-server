@@ -1,3 +1,9 @@
+2016-08-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: only record dark spectra at the start/end
+   of a aqcuisition series
+ * piccolo2/server/PiccoloControllerXbee.py: continue if radio is not
+   available
+
 2016-05-18 Magnus Hagdorn
  * piccolo2/server/PiccoloControllerXbee.py: report xbee serial
 

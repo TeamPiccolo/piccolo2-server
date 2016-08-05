@@ -106,6 +106,35 @@ class PiccoloThread(PiccoloWorkerThread):
             self._outCounter[key] += 1
         return self._outCounter[key]
 
+    def record(self,integrationTime,dark=False,upwelling=False):
+        if dark:
+            darkStr = 'dark'
+        else:
+            darkStr = 'light'
+        if upwelling:
+            direction = 'upwelling'
+        else:
+            direction = 'downwelling'
+        self.log.info("Record {0} {1} spectra".format(darkStr,direction))
+        
+        # open/close shutters as required
+        for shutter in self._shutters:
+            if not dark and shutter == direction:
+                self._shutters[shutter].openShutter()
+            else:
+                self._shutters[shutter].closeShutter()
+        
+        for s in integrationTime:
+            self._spectrometers[s].acquire(milliseconds=integrationTime[s],dark=dark,upwelling=upwelling)
+
+        self._wait()
+        spectra = []
+        for s in integrationTime:
+            spectra.append(self._spectrometers[s].getSpectrum())
+            
+        self._shutters[direction].closeShutter()
+        return spectra
+
     def run(self):
         while True:
             # wait for a new task from the task queue
@@ -130,6 +159,7 @@ class PiccoloThread(PiccoloWorkerThread):
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
                 spectra.prefix = prefix
+                cmd = None
                 n = n+1
                 if nCycles!='Inf' and n > nCycles:
                     break
@@ -144,64 +174,27 @@ class PiccoloThread(PiccoloWorkerThread):
                         return
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
-                self.log.info('Record dark upwelling spectra')
-                for shutter in self._shutters:
-                    self._shutters[shutter].closeShutter()
-                for s in integrationTime['upwelling']:
-                    self._spectrometers[s].acquire(milliseconds=integrationTime['upwelling'][s],dark=True,upwelling=True)
-                # wait for all results
-                self._wait()
-                for s in integrationTime['upwelling']:
-                    spectra.append(self._spectrometers[s].getSpectrum())
-                # check for abort/shutdown
-                cmd = self._getCommands(block=False)
+                # only record dark spectra at the beginning or end
+                if n==1 or n==nCycles:
+                    pattern = [(True,True),(False,True),(False,False),(True,False)]
+                else:
+                    pattern = [(False,True),(False,False)]
+                for p in pattern:
+                    if p[1]:
+                        direction = 'upwelling'
+                    else:
+                        direction = 'downwelling'
+                    for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
+                        spectra.append(s)
+                    # check for abort/shutdown
+                    cmd = self._getCommands(block=False)
+                    if cmd in ['abort','shutdown']:
+                        break
+
                 if cmd=='abort':
                     break
                 elif cmd=='shutdown':
                     return
-
-                # record upwelling spectra
-                self.log.info('Record upwelling spectra')
-                self._shutters['upwelling'].openShutter()
-                for s in integrationTime['upwelling']:
-                    self._spectrometers[s].acquire(milliseconds=integrationTime['upwelling'][s],dark=False,upwelling=True)
-                # wait for all results
-                self._wait()
-                for s in integrationTime['upwelling']:
-                    spectra.append(self._spectrometers[s].getSpectrum())
-                self._shutters['upwelling'].closeShutter()
-                # check for abort/shutdown
-                cmd = self._getCommands(block=False)
-                if cmd=='abort':
-                    break
-                elif cmd=='shutdown':
-                    return
-
-                # record downwelling spectra
-                self.log.info('Record downwelling spectra')
-                self._shutters['downwelling'].openShutter()
-                for s in integrationTime['downwelling']:
-                    self._spectrometers[s].acquire(milliseconds=integrationTime['downwelling'][s],dark=False,upwelling=False)
-                # wait for all results
-                self._wait()
-                for s in integrationTime['downwelling']:
-                    spectra.append(self._spectrometers[s].getSpectrum())
-                self._shutters['downwelling'].closeShutter()
-                # check for abort/shutdown
-                cmd = self._getCommands(block=False)
-                if cmd=='abort':
-                    break
-                elif cmd=='shutdown':
-                    return
-
-                # record downwelling dark spectra
-                self.log.info('Record dark upwelling spectra')
-                for s in integrationTime['downwelling']:
-                    self._spectrometers[s].acquire(milliseconds=integrationTime['downwelling'][s],dark=True,upwelling=False)
-                # wait for all results
-                self._wait()
-                for s in integrationTime['downwelling']:
-                    spectra.append(self._spectrometers[s].getSpectrum())
 
                 self.results.put(spectra)
                 self.log.info('finished acquisition {0}/{1}'.format(n,nCycles))
