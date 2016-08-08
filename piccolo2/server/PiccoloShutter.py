@@ -91,7 +91,7 @@ class PiccoloShutter(PiccoloInstrument):
         """close the shutter"""
         
         if not self._lock.locked():
-            self.log.warn('shutter already closed')
+            self.log.info('shutter already closed')
             return 'shutter already closed'
         if self._shutter!=None:
             self._shutter.close()

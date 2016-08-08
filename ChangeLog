@@ -1,3 +1,7 @@
+2016-08-08 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add method to collect dark spectra
+ * piccolo2/server/PiccoloShutter.py: do not warn if shutter already closed
+
 2016-08-05 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: only record dark spectra at the start/end
    of a aqcuisition series

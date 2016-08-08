@@ -91,7 +91,8 @@ class PiccoloThread(PiccoloWorkerThread):
                         return
                     else:
                         self.log.warn('acquisition paused')
-
+        elif cmd == 'dark':
+            return cmd
         else:
             assert len(cmd)==4
             if self.busy.locked():
@@ -156,6 +157,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
             n = 0
             prefix = os.path.join(outDir,'{0:04d}_'.format(self.getCounter(outDir)))
+            dark = False
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
                 spectra.prefix = prefix
@@ -172,13 +174,16 @@ class PiccoloThread(PiccoloWorkerThread):
                         break
                     elif cmd=='shutdown':
                         return
+                    elif cmd=='dark':
+                        dark = True
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
                 # only record dark spectra at the beginning or end
-                if n==1 or n==nCycles:
+                if n==1 or n==nCycles or dark:
                     pattern = [(True,True),(False,True),(False,False),(True,False)]
                 else:
                     pattern = [(False,True),(False,False)]
+                dark = False
                 for p in pattern:
                     if p[1]:
                         direction = 'upwelling'
@@ -190,6 +195,8 @@ class PiccoloThread(PiccoloWorkerThread):
                     cmd = self._getCommands(block=False)
                     if cmd in ['abort','shutdown']:
                         break
+                    if cmd == 'dark':
+                        dark = True
 
                 if cmd=='abort':
                     break
@@ -323,6 +330,13 @@ class Piccolo(PiccoloInstrument):
         self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
         return 'ok'
     
+    def dark(self):
+        """record a dark spectrum"""
+        if not self._busy.locked():
+            self.log.warning("not recording")
+            return 'nok: not recording'
+        self._tQ.put('dark')
+        return 'ok'
 
     def abort(self):
         self._tQ.put('abort')
