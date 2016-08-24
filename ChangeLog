@@ -1,3 +1,9 @@
+2016-08-24 Magnus Hagdorn
+ * Source/server/piccolo2/pserver.py: do not die when xbee radio cannot be 
+   initialised
+ * Source/server/piccolo2/server/PiccoloControllerXbee.py: attempt to port to
+   new piccolo2 hardware module
+
 2016-08-08 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: add method to collect dark spectra
  * piccolo2/server/PiccoloShutter.py: do not warn if shutter already closed

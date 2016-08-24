@@ -107,7 +107,6 @@ def piccolo_server(serverCfg):
         pXBEEController = piccolo.PiccoloControllerXbee()
     except Exception as e:
         log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
-        raise
     if pXBEEController!=None:
         pd.registerController(pXBEEController)
 
