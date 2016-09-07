@@ -118,7 +118,7 @@ class PiccoloDataDir(object):
             if cmdPipe.wait()!=0:
                 raise OSError, 'unmounting {}: {}'.format(self._device, cmdPipe.stderr.read())
 
-    def getFileList(self,path,pattern='*.pico'):
+    def getFileList(self,path,pattern='*.pico*'):
         p = self.join(path)
         fileList = []
         for f in glob.glob(os.path.join(p,pattern)):
