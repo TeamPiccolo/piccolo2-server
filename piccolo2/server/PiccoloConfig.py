@@ -59,6 +59,14 @@ defaultCfgStr = """
   [[__many__]]
     detectorTemperature = float(default=None)
     fan = boolean(default=None)
+
+# configure output options
+[output]
+  # overwrite output files when clobber is set to True
+  clobber = boolean(default=True)
+  # write separate files containing only dark and light spectra when split is 
+  # set to True
+  split = boolean(default=True)
 """
 
 # populate the default  config object which is used as a validator

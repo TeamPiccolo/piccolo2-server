@@ -96,7 +96,9 @@ def piccolo_server(serverCfg):
         pd.registerComponent(spectrometers[sname])
 
     # initialise the piccolo component
-    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers)
+    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,
+                         clobber=piccoloCfg.cfg['output']['clobber'],
+                         split=piccoloCfg.cfg['output']['split'])
     pd.registerComponent(pc)
 
     pJSONController = piccolo.PiccoloControllerCherryPy()

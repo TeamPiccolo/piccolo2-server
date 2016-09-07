@@ -211,7 +211,7 @@ class PiccoloThread(PiccoloWorkerThread):
 class PiccoloOutput(threading.Thread):
     """piccolo writer thread"""
 
-    def __init__(self,name,datadir,spectra,clobber=True,daemon=True):
+    def __init__(self,name,datadir,spectra,clobber=True,daemon=True,split=True):
         assert isinstance(spectra,Queue)
         
         threading.Thread.__init__(self)
@@ -224,6 +224,7 @@ class PiccoloOutput(threading.Thread):
         self._spectraQ = spectra
         self._datadir = datadir
         self._clobber = clobber
+        self._split = split
 
     @property
     def log(self):
@@ -237,7 +238,10 @@ class PiccoloOutput(threading.Thread):
                 return
 
             self.log.info('writing {} to {}'.format(self._datadir.datadir,spectra.outName))
-            spectra.write(prefix=self._datadir.datadir,clobber=self._clobber)
+            try:
+                spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
+            except RuntimeError, e:
+                self.log.error('writing {} to {}: {}'.format(self._datadir.datadir,spectra.outName,e))
             
 
 class Piccolo(PiccoloInstrument):
@@ -245,7 +249,7 @@ class Piccolo(PiccoloInstrument):
 
     the piccolo server itself is treated as an instrument"""
 
-    def __init__(self,name,datadir,shutters,spectrometers):
+    def __init__(self,name,datadir,shutters,spectrometers,clobber=True,split=True):
         """
         :param name: name of the component
         :param datadir: data directory
@@ -253,7 +257,9 @@ class Piccolo(PiccoloInstrument):
         :param shutters: dictionary of attached shutters
         :type shutters: dict(PiccoloShutter)
         :param spectrometers: dictionary of attached spectrometers
-        :type spectrometers: dict(PiccoloSpectrometer)"""
+        :type spectrometers: dict(PiccoloSpectrometer)
+        :param clobber: overwrite exciting files when set to True
+        :param split: split files into dark and light spectra when set to True"""
 
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
@@ -282,7 +288,7 @@ class Piccolo(PiccoloInstrument):
         self._worker.start()
 
         # handling the output thread
-        self._output = PiccoloOutput(name,self._datadir,self._rQ)
+        self._output = PiccoloOutput(name,self._datadir,self._rQ,clobber=clobber,split=split)
         self._output.start()
 
     def getSpectrometerList(self):
