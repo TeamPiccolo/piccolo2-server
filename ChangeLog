@@ -1,3 +1,7 @@
+2016-09-21 Magnus Hagdorn
+ * Source/server/etc/piccolo.cfg: listen for piccolo instructions on any
+   network interface
+
 2016-09-07 Magnus Hagdorn
  * server/piccolo2/pserver.py: get clobber and split flags from config and
    pass on
