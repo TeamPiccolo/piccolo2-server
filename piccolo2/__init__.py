@@ -15,4 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with piccolo2-server.  If not, see <http://www.gnu.org/licenses/>.
 
-__import__('pkg_resources').declare_namespace(__name__)
+try:
+    __import__('pkg_resources').declare_namespace(__name__)
+except ImportError as e:
+    e.args += ("Cannot start Piccolo Server due to an import error. The reason may be that Python Setuptools is not installed.", )
+    raise(e)
