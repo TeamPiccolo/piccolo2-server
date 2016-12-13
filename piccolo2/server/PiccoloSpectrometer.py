@@ -30,7 +30,6 @@ import threading
 from Queue import Queue
 import logging
 
-
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
 
@@ -75,12 +74,15 @@ class SpectrometerThread(PiccoloWorkerThread):
             # write results to the result queue
             self.results.put(spectrum)
             self.busy.release()
-            
+
 class PiccoloSpectrometer(PiccoloInstrument):
+    """Class to communicate with a spectrometer."""
+
     def __init__(self,name,spectrometer=None):
-        
+
         PiccoloInstrument.__init__(self,name)
 
+        # The lock prevents two threads using the spectrometer at the same time.
         self._busy = threading.Lock()
         self._tQ = Queue()
         self._rQ = Queue()
@@ -115,7 +117,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
     def info(self):
         """get info
 
-        :returns: dictionary containing shutter information
+        :returns: dictionary containing information about the spectrometer
         :rtype: dict"""
 
         return {'serial' : self._serial,
@@ -132,6 +134,10 @@ class PiccoloSpectrometer(PiccoloInstrument):
         :type upwelling: bool
         :return: *ok* if command successful or 'nok: message' if somethign went wrong"""
 
+        # If the spectrometer is locked this suggests that it is already
+        # acquiring a spectrum (or performing an associated task). It is not
+        # possible to queue up multiple spectra, so just issue a warning
+        # instead.
         if self._busy.locked():
             self.log.warning("already recording a spectrum")
             return 'nok: already recording spectrum'
@@ -159,6 +165,7 @@ if __name__ == '__main__':
     nSpec = 2
     specs = []
     for i in range(nSpec):
+        # Create a spectrometer, but don't pass a spectrometer object.
         specs.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
     for s in specs:
         print s.status()
@@ -174,6 +181,5 @@ if __name__ == '__main__':
         print spec.getNumberOfPixels()
         spectra.append(spec)
     spectra.write()
-    
-    time.sleep(0.5)
 
+    time.sleep(0.5)
