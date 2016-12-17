@@ -30,12 +30,13 @@ import threading
 from Queue import Queue
 import logging
 
-class AquireTask(object):
+class AcquireTask(object):
     """Class to hold instructions for acquiring a spectrum."""
 
-    self._direction = None # Can be 'upwelling' or 'downwelling'. No default.
-    self._integrationTime = None # milliseconds. No default.
-    self._dark = False # True if dark, False if light. Default: False.
+    def init(self):
+        self._direction = None # Can be 'upwelling' or 'downwelling'. No default.
+        self._integrationTime = None # milliseconds. No default.
+        self._dark = False # True if dark, False if light. Default: False.
 
     @property
     def direction(self):
@@ -85,6 +86,8 @@ class AquireTask(object):
             tFloat = float(t)
         except TypeError:
             raise TypeError('The integration time must be a number. {} is not a number, it is {}.'.format(t, type(t)))
+        if tFloat < 0:
+            raise Exception('The integraiton time ({} ms) cannot be negative.'.format(tFloat))
         self._integrationTime = t
 
     @property
@@ -127,23 +130,26 @@ class SpectrometerThread(PiccoloWorkerThread):
             if task == None:
                 self.log.info('shutting down')
                 return
-            else:
-                (milliseconds,dark,upwelling) = task
-            self.log.info("start recording for {} milliseconds".format(milliseconds))
+            self.log.info("start recording for {} milliseconds".format(task.integrationTime))
             self.busy.acquire()
 
             # create new spectrum instance
             spectrum = PiccoloSpectrum()
-            spectrum.setDark(dark)
-            spectrum.setUpwelling(upwelling)
+            spectrum.setDark(task.dark)
+            if task.direction == 'upwelling':
+                spectrum.setUpwelling(True)
+            elif task.direction == 'downwelling':
+                spectrum.setUpwelling(False)
+            else:
+                raise Exception('Unsupported direction: "{}"'.format(task.direction))
             spectrum['name'] = self.name
 
             # record data
             if self._spec==None:
-                time.sleep(milliseconds/1000.)
+                time.sleep(task.integrationTime/1000.)
                 pixels = [1]*100
             else:
-                self._spec.setIntegrationTime(milliseconds)
+                self._spec.setIntegrationTime(task.integrationTime)
                 spectrum.update(self._spec.getMetadata())
                 self._spec.requestSpectrum()
                 pixels = self._spec.readSpectrum()
@@ -220,7 +226,19 @@ class PiccoloSpectrometer(PiccoloInstrument):
         if self._busy.locked():
             self.log.warning("already recording a spectrum")
             return 'nok: already recording spectrum'
-        self._tQ.put((milliseconds,dark,upwelling))
+
+        # Create an acquire task.
+        task = AcquireTask()
+        task.integrationTime = milliseconds
+        task.dark = dark
+        if upwelling is True:
+            task.direction = 'upwelling'
+        else:
+            task.direction = 'downwelling'
+
+        # Put the task onto the task queue. This will get picked up by
+        # SpectrometerThread (if it is running).
+        self._tQ.put(task)
         return 'ok'
 
     def getSpectrum(self):
