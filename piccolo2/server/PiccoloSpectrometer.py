@@ -30,8 +30,17 @@ import threading
 from Queue import Queue
 import logging
 
-class AcquireTask(object):
-    """Class to hold instructions for acquiring a spectrum."""
+class Task(object):
+    pass
+
+class AcquireTask(Task):
+    """Class to hold instructions for acquiring a spectrum.
+
+    The instructions tell the spectrometer to acquire a spectrum at a specified
+    integration time. The direction must also be specified to tell the
+    spectrometer which shutter to open. If the spectrum is specified to be a
+    dark spectrum, the shutter is closed during the acquisition.
+    """
 
     def init(self):
         self._direction = None # Can be 'upwelling' or 'downwelling'. No default.
@@ -111,6 +120,28 @@ class AcquireTask(object):
         if not isinstance(isDark, bool):
             raise TypeError("Dark must be True or False. {} is {}.".format(isDark, type(isDark)))
         self._dark = isDark
+
+class AutointegrateTask(Task):
+    """Class to represent a request for an autointegration.
+
+    The autointegration task is used to prepare a spectrometer autointegration.
+
+    Two parameters must be provided:
+
+    1. How close should the spectrum be to saturation?
+    2. What's the longest integration time that would be acceptable?
+
+    The first of these could be specified as a percentage of the spectrometer's
+    saturation level. A value of 70 per cent would be typical and allow space
+    for any fluctuation in the light level during the acquisition of a batch.
+
+    The second parameter should default to the maximum integration time
+    supported by the spectrometer. There is likely to be a user-specified
+    maximum integration time at which spectra will be acquired. Longer than this
+    and spectra are too noisy to be used.
+    """
+
+    pass # Not implemented yet.
 
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
