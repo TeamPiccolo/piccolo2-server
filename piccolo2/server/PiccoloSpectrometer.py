@@ -30,6 +30,42 @@ import threading
 from Queue import Queue
 import logging
 
+class AquireTask(object):
+    """Class to hold instructions for acquiring a spectrum."""
+
+    self._direction = None # Can be 'upwelling' or 'downwelling'.
+    self._integrationTime = None # milliseconds
+    self._dark = None # True if dark, False if light.
+
+    @property
+    def direction(self):
+        """Returns the direction as a string.
+
+        :returns:  int -- the return code.
+        """
+
+    @direction.setter
+    def direction(self, newDirection):
+        """Set the (optical) direction of the spectrum to be acquired.
+
+        This is the direction which light entering the spectrometer originiates
+        from. The allowed directions are "upwelling" and "downwelling". The
+        downwelling direction is typically used to acquire a spectrum of light
+        travelling downwards from the sky. The upwelling direction is typically
+        used to acquire a spectrum of light reflected from the ground, i.e. the
+        light is travelling upwards.
+
+        :param newDirection: 'upwelling' or 'downwelling'
+        :type newDirection: str
+        """
+
+        newDirectionLowerCase = newDirection.lower()
+        if newDirectionLowerCase != 'upwelling' and newDirectionLowerCase != 'downwelling':
+            raise TypeError('The Piccolo supports only two directions: "downwelling" and "upwelling". The direction "{}" is not supported.'.format(newDirection))
+        self._direction = newDirectionLowerCase
+
+    @property
+
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
 
