@@ -17,7 +17,7 @@
 
 """
 .. moduleauthor:: Magnus Hagdorn <magnus.hagdorn@ed.ac.uk>
-.. moduleauthor:: Iain Robinson <iain.robinson@ed.ac.uk>
+.. moduleauthor:: Iain Robinson <iain@physics.org>
 """
 
 __all__ = ['PiccoloSpectrometer']
@@ -33,16 +33,19 @@ import logging
 class AquireTask(object):
     """Class to hold instructions for acquiring a spectrum."""
 
-    self._direction = None # Can be 'upwelling' or 'downwelling'.
-    self._integrationTime = None # milliseconds
-    self._dark = None # True if dark, False if light.
+    self._direction = None # Can be 'upwelling' or 'downwelling'. No default.
+    self._integrationTime = None # milliseconds. No default.
+    self._dark = False # True if dark, False if light. Default: False.
 
     @property
     def direction(self):
         """Returns the direction as a string.
 
-        :returns:  int -- the return code.
+        :returns:  str -- "upwelling" or "downwelling".
         """
+        if self._direction is None:
+            raise Exception('The direction (upwelling or downwelling) of the spectrum to be acquired has not been specified.')
+        return self._direction
 
     @direction.setter
     def direction(self, newDirection):
@@ -65,6 +68,46 @@ class AquireTask(object):
         self._direction = newDirectionLowerCase
 
     @property
+    def integrationTime(self):
+        if self._integrationTime is None:
+            raise Exception('The integration time of the spectrum to be acquired has not been specified.')
+        return self._integrationTime
+
+    @integrationTime.setter
+    def integrationTime(self, t):
+        """Set the integration time at which the spectrum will be acquired.
+
+        :param t: the integration time in milliseconds.
+        :type t: float
+        """
+        tFloat = None
+        try:
+            tFloat = float(t)
+        except TypeError:
+            raise TypeError('The integration time must be a number. {} is not a number, it is {}.'.format(t, type(t)))
+        self._integrationTime = t
+
+    @property
+    def dark(self):
+        """Returns True is the spectrum is a dark spectrum, False otherwise."""
+        if self._dark is None:
+            raise Exception('It has not been specified as to whether the spectrum to be acquired is a dark spectrum.')
+        return self._dark
+
+    @dark.setter
+    def dark(self, isDark):
+        """Set to True if a dark spectrum is to be acquired.
+
+        By default, a light spectrum will be acquired. It is therefore only
+        necessary to set dark to True when preparing a task to acquire a dark
+        spectrum.
+
+        :param isDark: True if the spectrum is dark, false if it is light.
+        :type isDark: bool
+        """
+        if not isinstance(isDark, bool):
+            raise TypeError("Dark must be True or False. {} is {}.".format(isDark, type(isDark)))
+        self._dark = isDark
 
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
