@@ -84,8 +84,8 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         # The lock prevents two threads using the spectrometer at the same time.
         self._busy = threading.Lock()
-        self._tQ = Queue()
-        self._rQ = Queue()
+        self._tQ = Queue() # Task queue.
+        self._rQ = Queue() # Results queue.
 
         if spectrometer!=None:
             self._serial = spectrometer.serialNumber
