@@ -141,8 +141,42 @@ class AutointegrateTask(Task):
     and spectra are too noisy to be used.
     """
 
-    pass # Not implemented yet.
+    def __init__(self):
+        self._tmax = None # Maximum permitted integration time in milliseconds.
+        self._percent = None # Best peak counts as a percentage of saturation.
 
+    @property
+    def maximumIntegrationTime(self):
+        """Get the maximum integration time that autointegration can return.
+
+        :returns:  float -- integration time in milliseconds.
+        """
+        return self._tmax
+
+    @maximumIntegrationTime.setter
+    def maximumIntegrationTime(self, t):
+        """Set the maximum integration time that autointegration will go to.
+
+        Autointegration determines the best integration time for the spectrum.
+        This function sets the maximum integration time that it may return. It
+        can be used to avoid having autointegration set very long integration
+        times on the spectrometer.
+
+        The default value is None. If set to None, it will default to the
+        maximum integration time supported by the spectrometer. This will vary
+        from model to model, but is typically about 1 min.
+
+        :param t: maximum integration time in milliseconds.
+        :type t: float or int
+        """
+        try:
+            tFloat = float(t) # t could be an integer or a float.
+        except ValueError as e:
+            raise ValueError('The integration time must be a number. {} is {}.'.format(t, type(t)))
+        if tFloat < 0:
+            raise ValueError("The integration time cannot be negative.")
+        self._tmax = tFloat
+    
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
 
