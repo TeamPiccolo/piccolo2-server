@@ -143,7 +143,64 @@ class AutointegrateTask(Task):
 
     def __init__(self):
         self._tmax = None # Maximum permitted integration time in milliseconds.
-        self._percent = None # Best peak counts as a percentage of saturation.
+        self._target = 0.7 # Best peak counts as a percentage of saturation.
+
+    @property
+    def target(self):
+        """Returns the target peak level in the spectrum as a fraction of the
+        saturation level.
+        
+        :returns:   float -- target as a fraction
+        """
+        if self._target is None:
+            raise Exception('The target for the autointegration algorithm has not been set.')
+        return self._target
+
+    @property
+    def targetPercent(self):
+        """Returns the target peak level in the spectrum as a percentage.
+        
+        :returns:    float -- target as a percentage
+        """
+        return 100 * self._target
+    
+    @setter.target
+    def target(self, p):
+        """Set the target peak level in the spectrum as a fraction of the saturation level.
+
+        The autointegraiton algorithm determines the integration time that will
+        give a peak value in the spectrum that is close to the spectrometer's
+        saturation level. Exactly how close can be customized by setting the
+        target to some fraction of the saturation level. For example, setting
+        the target to 70 % (the default) should provide an integration time
+        that results in a spectrum with a peak value that is 70 % of the saturation
+        level.
+        
+        :param p: target peak level as a fraction of saturation level
+        :type p: float
+        """
+        try:
+            p_float = float(p)
+        except ValueError:
+            raise Exception('The autointegration target peak value must be a number. {} is type {}.'.format(p, type(p))
+        if p_float < 0.01:
+            raise Exception('The autointegration target peak value, {} %, is below 1 % of the saturation level and this seems too low.'.format(100*p_float))
+        if p_float > 1.0:
+            raise Exception('The autointegratiopn target peak value, {} %, is greater than 100 %. Targets exceeding 100 % of saturation are not allowed.'.format(100*p_float))
+        self._target = p_float
+
+    @setter.targetPercent
+    def targetPercent(self, p):
+        """Set the target peak level in the spectrum as a percentage.
+        
+        :param p: target peak level as a percentage
+        :type p: int or float
+        """
+        try:
+            p_float = float(p)
+        except ValueError:
+            raise Exception('The autointegration peak value must be a percentage. {} is type {}.'.format(p, type(p))
+        self.target = p_float / float(100)
 
     @property
     def maximumIntegrationTime(self):
