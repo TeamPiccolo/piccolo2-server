@@ -141,7 +141,7 @@ class PiccoloThread(PiccoloWorkerThread):
                     # Warning: the line below does not lock the spectrometer
                     # before using it. See: PiccoloSpectrometer.py
 
-                    t = self._spectrometers[s]._spectrometer._spec.findBestIntegrationTime(percent=70, test_integration_times=[5, 10, 25,50])
+                    t = self._spectrometers[s]._spectrometer._spec.findBestIntegrationTime(percent=70)
                 except Exception as e:
                     t = integrationTime[s]
                     self.log.warning('Auto integration error: {}'.format(e))
