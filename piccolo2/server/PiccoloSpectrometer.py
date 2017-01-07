@@ -149,7 +149,7 @@ class AutointegrateTask(Task):
     def target(self):
         """Returns the target peak level in the spectrum as a fraction of the
         saturation level.
-        
+
         :returns:   float -- target as a fraction
         """
         if self._target is None:
@@ -159,11 +159,11 @@ class AutointegrateTask(Task):
     @property
     def targetPercent(self):
         """Returns the target peak level in the spectrum as a percentage.
-        
+
         :returns:    float -- target as a percentage
         """
         return 100 * self._target
-    
+
     @setter.target
     def target(self, p):
         """Set the target peak level in the spectrum as a fraction of the saturation level.
@@ -175,7 +175,7 @@ class AutointegrateTask(Task):
         the target to 70 % (the default) should provide an integration time
         that results in a spectrum with a peak value that is 70 % of the saturation
         level.
-        
+
         :param p: target peak level as a fraction of saturation level
         :type p: float
         """
@@ -192,7 +192,7 @@ class AutointegrateTask(Task):
     @setter.targetPercent
     def targetPercent(self, p):
         """Set the target peak level in the spectrum as a percentage.
-        
+
         :param p: target peak level as a percentage
         :type p: int or float
         """
@@ -233,7 +233,41 @@ class AutointegrateTask(Task):
         if tFloat < 0:
             raise ValueError("The integration time cannot be negative.")
         self._tmax = tFloat
-    
+
+class AutointegrateResult(object):
+    """Class to hold the result of an autointegration."""
+    def __init__(self):
+        self._error = "" # Empty string means no error.
+        self._t = None # The best integration time or None if autointegration failed.
+        self._debug = None # Optional debug data.
+
+    @property
+    def success(self):
+        if self._t is None:
+            return False
+        else:
+            return True
+
+    @property
+    def errorMessage(self):
+        if self.success():
+            raise Exception('There is no error message from autointegration because the autointegration algorithm worked and return time {} ms'.format(self.bestIntegrationTime))
+        if len(self._error) == 0:
+            raise Exception('The autointegration algorithm failed, but did not provide an error message.')
+        return self._error
+    @setter.errorMessage(self, message):
+        if len(self._error) > 0:
+            raise Exception('Cannot overwrite autointegraiton error message.')
+        self._error = message
+
+    @property
+    def bestIntegrationTime(self):
+        if not self.success():
+            raise Exception('Could not get the best integration time because the autointegration algorithm failed.')
+        return self._t
+    @setter.bestIntegrationTime(self):
+
+
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer Worker Thread object"""
 
