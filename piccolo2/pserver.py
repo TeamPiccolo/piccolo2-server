@@ -111,7 +111,7 @@ def piccolo_server(serverCfg):
         log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
     if pXBEEController!=None:
         pd.registerController(pXBEEController)
-
+    log.warn('JAcomment')
     pd.start()
 
     # start the webservice

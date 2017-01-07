@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with piccolo2-server.  If not, see <http://www.gnu.org/licenses/>.
 
+# To issue a warning, should be self.log.warn or self.log.warning?
+
 """
 .. moduleauthor:: Magnus Hagdorn <magnus.hagdorn@ed.ac.uk>
 
@@ -44,7 +46,7 @@ class PiccoloThread(PiccoloWorkerThread):
     def __init__(self,name,shutters,spectrometers,busy,paused,tasks,results):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
-        
+
         self._paused = paused
         self._shutters = shutters
         self._spectrometers = spectrometers
@@ -58,7 +60,7 @@ class PiccoloThread(PiccoloWorkerThread):
             cmd = self.tasks.get(block=block)
         except Empty:
             return
-        
+
         self.log.debug(cmd)
 
         if cmd == None:
@@ -99,7 +101,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.log.warn('already recording data')
                 return
             return cmd
-        
+
     def getCounter(self,key):
         if key not in self._outCounter:
             self._outCounter[key] = 0
@@ -117,22 +119,43 @@ class PiccoloThread(PiccoloWorkerThread):
         else:
             direction = 'downwelling'
         self.log.info("Record {0} {1} spectra".format(darkStr,direction))
-        
+
         # open/close shutters as required
         for shutter in self._shutters:
             if not dark and shutter == direction:
                 self._shutters[shutter].openShutter()
             else:
                 self._shutters[shutter].closeShutter()
-        
+
         for s in integrationTime:
-            self._spectrometers[s].acquire(milliseconds=integrationTime[s],dark=dark,upwelling=upwelling)
+            # This modification overrides the default by performing an
+            # autointegration before every set of spectra. Later this will be
+            # modified so that the auto-integration is performed only before
+            # the start of a batch.
+
+            # Find the best integration time.
+            if dark:
+                t = integrationTime[s]
+            else:
+                try:
+                    # Warning: the line below does not lock the spectrometer
+                    # before using it. See: PiccoloSpectrometer.py
+
+                    t = self._spectrometers[s]._spectrometer._spec.findBestIntegrationTime(percent=70, test_integration_times=[5, 10, 25,50])
+                except Exception as e:
+                    t = integrationTime[s]
+                    self.log.warning('Auto integration error: {}'.format(e))
+                    self.log.warning('Failed to determine the best integration time for the {} spectrometer {} direction. Using the default: {} ms'.format(self._spectrometers[s]._spectrometer._spec.getDeviceName(), direction, t))
+
+#            self._spectrometers[s].acquire(milliseconds=integrationTime[s],dark=dark,upwelling=upwelling)
+            self._spectrometers[s].acquire(milliseconds=t,dark=dark,upwelling=upwelling)
+
 
         self._wait()
         spectra = []
         for s in integrationTime:
             spectra.append(self._spectrometers[s].getSpectrum())
-            
+
         self._shutters[direction].closeShutter()
         return spectra
 
@@ -213,7 +236,7 @@ class PiccoloOutput(threading.Thread):
 
     def __init__(self,name,datadir,spectra,clobber=True,daemon=True,split=True):
         assert isinstance(spectra,Queue)
-        
+
         threading.Thread.__init__(self)
         self.name = name
         self.daemon = daemon
@@ -242,7 +265,7 @@ class PiccoloOutput(threading.Thread):
                 spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
             except RuntimeError, e:
                 self.log.error('writing {} to {}: {}'.format(self._datadir.datadir,spectra.outName,e))
-            
+
 
 class Piccolo(PiccoloInstrument):
     """piccolo server instrument
@@ -264,7 +287,7 @@ class Piccolo(PiccoloInstrument):
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
         self._datadir = datadir
-        
+
         self._spectraCache = (None,None)
 
         self._spectrometers = spectrometers.keys()
@@ -314,7 +337,7 @@ class Piccolo(PiccoloInstrument):
 
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
-        
+
         :param shutter: the shutter name
         :param spectrometer: the spectrometer name"""
         if shutter not in self.getShutterList():
@@ -335,7 +358,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok: already recording'
         self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
         return 'ok'
-    
+
     def dark(self):
         """record a dark spectrum"""
         if not self._busy.locked():
@@ -353,7 +376,7 @@ class Piccolo(PiccoloInstrument):
     def status(self):
         """return status of shutter
 
-        :return: (busy,paused) 
+        :return: (busy,paused)
         :rtype:  (bool, bool)"""
 
         busy = self._busy.locked()
@@ -412,7 +435,7 @@ class Piccolo(PiccoloInstrument):
                 raise OSError, 'setting date to \'{}\': {}'.format(clock,cmdPipe.stderr.read())
             return cmdPipe.stdout.read()
         return ''
-        
+
     def isMountedDataDir(self):
         """check if datadir is mounted"""
         return self._datadir.isMounted
