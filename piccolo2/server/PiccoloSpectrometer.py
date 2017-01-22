@@ -18,6 +18,10 @@
 """
 .. moduleauthor:: Magnus Hagdorn <magnus.hagdorn@ed.ac.uk>
 .. moduleauthor:: Iain Robinson <iain@physics.org>
+
+The Piccolo Spectrometer module handles communication with the spectrometers. It
+uses threading to enable spectrometers to acquire in the background whilst other
+tasks (such as communication) are being performed.
 """
 
 __all__ = ['PiccoloSpectrometer']
@@ -182,7 +186,7 @@ class AutointegrateTask(Task):
         try:
             p_float = float(p)
         except ValueError:
-            raise Exception('The autointegration target peak value must be a number. {} is type {}.'.format(p, type(p))
+            raise Exception('The autointegration target peak value must be a number. {} is type {}.'.format(p, type(p)))
         if p_float < 0.01:
             raise Exception('The autointegration target peak value, {} %, is below 1 % of the saturation level and this seems too low.'.format(100*p_float))
         if p_float > 1.0:
@@ -199,7 +203,7 @@ class AutointegrateTask(Task):
         try:
             p_float = float(p)
         except ValueError:
-            raise Exception('The autointegration peak value must be a percentage. {} is type {}.'.format(p, type(p))
+            raise Exception('The autointegration peak value must be a percentage. {} is type {}.'.format(p, type(p)))
         self.target = p_float / float(100)
 
     @property
@@ -234,7 +238,10 @@ class AutointegrateTask(Task):
             raise ValueError("The integration time cannot be negative.")
         self._tmax = tFloat
 
-class AutointegrateResult(object):
+class Result(object):
+    pass
+
+class AutointegrateResult(Result):
     """Class to hold the result of an autointegration."""
     def __init__(self):
         self._error = "" # Empty string means no error.
@@ -255,28 +262,49 @@ class AutointegrateResult(object):
         if len(self._error) == 0:
             raise Exception('The autointegration algorithm failed, but did not provide an error message.')
         return self._error
-    @setter.errorMessage(self, message):
+    @setter.errorMessage
+    def errorMessage(self, message):
         if len(self._error) > 0:
             raise Exception('Cannot overwrite autointegraiton error message.')
         self._error = message
 
     @property
     def bestIntegrationTime(self):
+        """Returns the best integration time in milliseconds."""
         if not self.success():
             raise Exception('Could not get the best integration time because the autointegration algorithm failed.')
         return self._t
-    @setter.bestIntegrationTime(self):
-
+    @setter.bestIntegrationTime
+    def bestIntegrationTime(self, t):
+        if t < 0:
+            raise Exception('The best integratipon time ({}) cannot be negative.'.format(t))
+        self._t = t
 
 class SpectrometerThread(PiccoloWorkerThread):
-    """Spectrometer Worker Thread object"""
+    """Spectrometer worker thread object. The worker thread performs assigned
+       tasks in the background and holds on to the results until they are
+       picked up."""
 
     LOGNAME = 'spectrometer'
 
-    def __init__(self,name,spectrometer,busy,tasks,results):
+    def __init__(self, name, spectrometer, busy, tasks, results):
+        """Initialize the worker thread.
 
-        PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
+        Note: calling __init__ does not start the thread, a subsequent call to
+        start() is needed to start the thread.
 
+        :param name: ?
+        :type name: str
+        :param spectrometer: A PiccoloSpectrometer object
+        :type spectrometer: PiccoloSpectrometer
+        :param busy: a "lock" which prevents using the spectrometer when it is busy
+        :type busy: thread.lock
+        :param tasks: a queue into which tasks will be put
+        :type tasks: Queue.Queue
+        :param results: the results queue from where results will be collected
+        :type results: Queue.Queue
+        """
+        PiccoloWorkerThread.__init__(self, name, busy, tasks, results)
         self._spec = spectrometer
 
     def run(self):
@@ -284,7 +312,9 @@ class SpectrometerThread(PiccoloWorkerThread):
             # wait for a new task from the task queue
             task = self.tasks.get()
             if task == None:
-                self.log.info('shutting down')
+                # The worker thread can be stopped by putting a None onto the
+                # task queue.
+                self.log.info('Stopping a PiccoloSpectrometer thread: {}'.format(self.name))
                 return
             self.log.info("start recording for {} milliseconds".format(task.integrationTime))
             self.busy.acquire()
@@ -319,22 +349,33 @@ class SpectrometerThread(PiccoloWorkerThread):
 class PiccoloSpectrometer(PiccoloInstrument):
     """Class to communicate with a spectrometer."""
 
-    def __init__(self,name,spectrometer=None):
+    def __init__(self, name, spectrometer=None):
+        """Initialize a Piccolo Spectrometer object for Piccolo Server.
 
-        PiccoloInstrument.__init__(self,name)
+           The spectromter parameter must be the Spectrometer object from the
+           Piccolo Hardware module, such as OceanOpticsUSB2000Plus or
+           OceanOpticsQEPro.
+
+           name is a descriptive name for the spectrometer.
+
+           :param name: a descriptive name for the spectrometer.
+           :param spectrometer: the spectromtere, which may be None.
+        """
+
+        PiccoloInstrument.__init__(self, name)
 
         # The lock prevents two threads using the spectrometer at the same time.
         self._busy = threading.Lock()
         self._tQ = Queue() # Task queue.
         self._rQ = Queue() # Results queue.
 
-        if spectrometer!=None:
+        if spectrometer != None:
             self._serial = spectrometer.serialNumber
         else:
             self._serial = None
 
-        self._spectrometer = SpectrometerThread(name,spectrometer,self._busy,self._tQ,self._rQ)
-        self._spectrometer.start()
+        self._spectrometer = SpectrometerThread(name, spectrometer, self._busy, self._tQ, self._rQ)
+        self._spectrometer.start() # Start the thread.
 
     def __del__(self):
         # send poison pill to worker
@@ -410,7 +451,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
         return self._rQ.get(block,timeout)
 
 if __name__ == '__main__':
-
+    # This code is used to test the PiccoloSpectrometer module in Piccolo Server.
     from piccoloLogging import *
 
     piccoloLogging(debug=True)
