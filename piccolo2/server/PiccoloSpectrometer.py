@@ -168,7 +168,7 @@ class AutointegrateTask(Task):
         """
         return 100 * self._target
 
-    @setter.target
+    @target.setter
     def target(self, p):
         """Set the target peak level in the spectrum as a fraction of the saturation level.
 
@@ -193,7 +193,7 @@ class AutointegrateTask(Task):
             raise Exception('The autointegratiopn target peak value, {} %, is greater than 100 %. Targets exceeding 100 % of saturation are not allowed.'.format(100*p_float))
         self._target = p_float
 
-    @setter.targetPercent
+    @targetPercent.setter
     def targetPercent(self, p):
         """Set the target peak level in the spectrum as a percentage.
 
@@ -262,7 +262,7 @@ class AutointegrateResult(Result):
         if len(self._error) == 0:
             raise Exception('The autointegration algorithm failed, but did not provide an error message.')
         return self._error
-    @setter.errorMessage
+    @errorMessage.setter
     def errorMessage(self, message):
         if len(self._error) > 0:
             raise Exception('Cannot overwrite autointegraiton error message.')
@@ -274,7 +274,7 @@ class AutointegrateResult(Result):
         if not self.success():
             raise Exception('Could not get the best integration time because the autointegration algorithm failed.')
         return self._t
-    @setter.bestIntegrationTime
+    @bestIntegrationTime.setter
     def bestIntegrationTime(self, t):
         if t < 0:
             raise Exception('The best integratipon time ({}) cannot be negative.'.format(t))
@@ -314,7 +314,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             if task == None:
                 # The worker thread can be stopped by putting a None onto the
                 # task queue.
-                self.log.info('Stopping a PiccoloSpectrometer thread: {}'.format(self.name))
+                self.log.info('Stopped worker thread for specrometer {}.'.format(self.name))
                 return
             self.log.info("start recording for {} milliseconds".format(task.integrationTime))
             self.busy.acquire()
@@ -332,9 +332,12 @@ class SpectrometerThread(PiccoloWorkerThread):
 
             # record data
             if self._spec==None:
+                # If spectrometer is None, thenm simulate a spectrometer, for
+                # testing purposes.
                 time.sleep(task.integrationTime/1000.)
                 pixels = [1]*100
             else:
+                # Have a real spectrometer, so acquire a real spectrum.
                 self._spec.setIntegrationTime(task.integrationTime)
                 spectrum.update(self._spec.getMetadata())
                 self._spec.requestSpectrum()
@@ -474,6 +477,6 @@ if __name__ == '__main__':
         spec = s.getSpectrum()
         print spec.getNumberOfPixels()
         spectra.append(spec)
-    spectra.write()
+#    spectra.write()
 
     time.sleep(0.5)
