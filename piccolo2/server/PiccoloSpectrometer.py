@@ -456,35 +456,46 @@ class PiccoloSpectrometer(PiccoloInstrument):
         return self._rQ.get(block,timeout)
 
 if __name__ == '__main__':
-    # This code is used to test the PiccoloSpectrometer module in Piccolo Server.
+    # This code is used to test the PiccoloSpectrometer module in Piccolo Server
+    # It is not used during normal operation.
     from piccoloLogging import *
-    from piccolo2.hardware import spectrometers as piccolo_spectrometers
+
+    have_hardware = False # True if the hardware drivers are available
+    try:
+        from piccolo2.hardware import spectrometers as piccolo_spectrometers
+        have_hardware = True
+    except ImportError as e:
+        print "Hardware drivers are not available."
 
     piccoloLogging(debug=True)
 
-    spectrometers = dict()
-    for s in piccolo_spectrometers.getConnectedSpectrometers():
+    # Detect and initialize the spectrometers, or simulate some spectrometers if
+    # none are connected.
+    spectrometers = []
+    if have_hardware:
+        for s in piccolo_spectrometers.getConnectedSpectrometers():
+            #strip out all non-alphanumeric characters
+            sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
+            spectrometers[sname] = PiccoloSpectrometer(sname,spectrometer=s)
+    if len(spectrometers) == 0: # No hardware drivers, or no spectrometers detected.
+        nSpectrometers = 2
+        print "No spectrometers connected. {} spectrometers will be simulated.".format(nSpectrometers)
+        for i in range(nSpectrometers):
+            # Create a spectrometer, but don't pass a spectrometer object.
+            spectrometers.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
 
-        #strip out all non-alphanumeric characters
-        sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
-        spectrometers[sname] = PiccoloSpectrometer(sname,spectrometer=s)
-    print spectrometers
-
-    nSpec = 2
-    specs = []
-    for i in range(nSpec):
-        # Create a spectrometer, but don't pass a spectrometer object.
-        specs.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
-    for s in specs:
+    for s in spectrometers:
         print s.status()
-    for i in range(nSpec):
-        specs[i].acquire(milliseconds=(nSpec-i)*2000)
+
+    for i in range(len(spectrometers)):
+        spectrometers[i].acquire(milliseconds=(len(spectrometers)-i)*2000)
+
     time.sleep(0.5)
-    for s in specs:
+    for s in spectrometers:
         print s.status()
 
     spectra = PiccoloSpectraList()
-    for s in specs:
+    for s in spectrometers:
         spec = s.getSpectrum()
         print spec.getNumberOfPixels()
         spectra.append(spec)
