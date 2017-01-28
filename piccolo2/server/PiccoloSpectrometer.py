@@ -510,14 +510,22 @@ if __name__ == '__main__':
             spectrometers.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
 
     for s in spectrometers:
-        print s.info()
+        info = s.info()
+        print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
+    print 'Starting acquisitions...'
     for i in range(len(spectrometers)):
         spectrometers[i].acquire(milliseconds=(len(spectrometers)-i)*2000)
 
+    for s in spectrometers:
+        info = s.info()
+        print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
+
+    print 'Waiting for half a second...'
     time.sleep(0.5)
     for s in spectrometers:
-        print s.info()
+        info = s.info()
+        print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
     spectra = PiccoloSpectraList()
     for s in spectrometers:
