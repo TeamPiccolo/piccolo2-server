@@ -411,25 +411,26 @@ class PiccoloSpectrometer(PiccoloInstrument):
                 'nSpectra' : self.numSpectra(),
                 'status' : self.status()}
 
-    def acquire(self,milliseconds=100,dark=False,upwelling=False):
-        """start recording a spectrum
+    def acquire(self, milliseconds=100, dark=False, upwelling=False):
+        """Start acquiring ("recording") a spectrum.
 
         :param milliseconds: the integration time in milliseconds
         :param dark: whether a dark spectrum is recorded
         :type dark: bool
         :param upwelling: with the direction is upwelling
         :type upwelling: bool
-        :return: *ok* if command successful or 'nok: message' if somethign went wrong"""
+        :return: "ok" if command successful or "nok: message" if something went wrong
+        """
 
         # If the spectrometer is locked this suggests that it is already
         # acquiring a spectrum (or performing an associated task). It is not
-        # possible to queue up multiple spectra, so just issue a warning
+        # possible to queue up acquisition tasks, so just issue a warning
         # instead.
         if self._busy.locked():
             self.log.warning("already recording a spectrum")
             return 'nok: already recording spectrum'
 
-        # Create an acquire task.
+        # Create an acquire task and set its parameters.
         task = AcquireTask()
         task.integrationTime = milliseconds
         task.dark = dark
@@ -444,16 +445,40 @@ class PiccoloSpectrometer(PiccoloInstrument):
         return 'ok'
 
     def getSpectrum(self):
-        """get the spectrum"""
+        """Get a spectrum.
+
+        Spectra are acquired using the acquire function. Once acquired, spectra
+        are held on a queue until they are picked up with this function.
+
+        If the spectrometer is busy (acquiring a spectrum) then this function
+        will wait, possibly forever, until a spectrum is available.
+
+        If the spectrometer is idle (not acquiring a spectrum) then this
+        function will wait, up to a maximum of 5 seconds, for a spectrum
+        to become available. If there is still no spectrum is available, an
+        exception (type Queue.Empty) is raised. This error occurs when an
+        attempt is made to get a spectrum without first acquiring one.
+
+        raises: An expcetion if there is not spectrum ready (after waiting).
+        retruns:
+        rtype:
+        """
 
         block=True
         if self._busy.locked():
+            # No spectrum is available now, but the spectrometer is busy
+            # acquiring a specturm. Wait until it is finished (however long
+            # it takes), then return the spectrum.
             self.log.debug("busy, waiting until spectrum is available")
             timeout = None
         else:
+            # No spectrum is available now, and the spectrometer is idle. This
+            # means either that no spectrum was acquired (which is an error), or
+            # that an acquistion task has _just_ been created, but the
+            # spectrometer has not yet changed its status from "idle" to "busy".
             self.log.debug("idle, waiting at most 5s for spectrum")
             timeout = 5
-        return self._rQ.get(block,timeout)
+        return self._rQ.get(block, timeout)
 
 if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server
@@ -476,7 +501,7 @@ if __name__ == '__main__':
         for s in piccolo_spectrometers.getConnectedSpectrometers():
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
-            spectrometers[sname] = PiccoloSpectrometer(sname,spectrometer=s)
+            spectrometers.append(PiccoloSpectrometer(sname,spectrometer=s))
     if len(spectrometers) == 0: # No hardware drivers, or no spectrometers detected.
         nSpectrometers = 2
         print "No spectrometers connected. {} spectrometers will be simulated.".format(nSpectrometers)
@@ -485,19 +510,19 @@ if __name__ == '__main__':
             spectrometers.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
 
     for s in spectrometers:
-        print s.status()
+        print s.info()
 
     for i in range(len(spectrometers)):
         spectrometers[i].acquire(milliseconds=(len(spectrometers)-i)*2000)
 
     time.sleep(0.5)
     for s in spectrometers:
-        print s.status()
+        print s.info()
 
     spectra = PiccoloSpectraList()
     for s in spectrometers:
         spec = s.getSpectrum()
-        print spec.getNumberOfPixels()
+        print "Got a spectrum with {} pixels".format(spec.getNumberOfPixels())
         spectra.append(spec)
 #    spectra.write()
 
