@@ -11,7 +11,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with piccolo2-server.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -372,10 +372,12 @@ class PiccoloSpectrometer(PiccoloInstrument):
         self._tQ = Queue() # Task queue.
         self._rQ = Queue() # Results queue.
 
-        if spectrometer != None:
-            self._serial = spectrometer.serialNumber
-        else:
+        if spectrometer is None:
+            self.log.warning('A PiccoloSpectrometer object has been created without a Spectrometer hadware object. This is usually only done for testing the Piccolo code. You should not see this message during normal operation.')
             self._serial = None
+        else:
+            self._serial = spectrometer.serialNumber
+
 
         self._spectrometer = SpectrometerThread(name, spectrometer, self._busy, self._tQ, self._rQ)
         self._spectrometer.start() # Start the thread.
