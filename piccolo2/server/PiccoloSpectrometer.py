@@ -458,8 +458,17 @@ class PiccoloSpectrometer(PiccoloInstrument):
 if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server.
     from piccoloLogging import *
+    from piccolo2.hardware import spectrometers as piccolo_spectrometers
 
     piccoloLogging(debug=True)
+
+    spectrometers = dict()
+    for s in piccolo_spectrometers.getConnectedSpectrometers():
+
+        #strip out all non-alphanumeric characters
+        sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
+        spectrometers[sname] = PiccoloSpectrometer(sname,spectrometer=s)
+    print spectrometers
 
     nSpec = 2
     specs = []
