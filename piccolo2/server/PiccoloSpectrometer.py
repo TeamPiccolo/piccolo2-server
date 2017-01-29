@@ -466,16 +466,18 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         block=True
         if self._busy.locked():
-            # No spectrum is available now, but the spectrometer is busy
-            # acquiring a specturm. Wait until it is finished (however long
-            # it takes), then return the spectrum.
+            # The spectrometer is busy acquiring a specturm. If no spectrum is
+            # available now, wait until it is finished, however long it takes.
             self.log.debug("busy, waiting until spectrum is available")
             timeout = None
         else:
-            # No spectrum is available now, and the spectrometer is idle. This
-            # means either that no spectrum was acquired (which is an error), or
-            # that an acquistion task has _just_ been created, but the
-            # spectrometer has not yet changed its status from "idle" to "busy".
+            # The spectrometer is idle. This situation can occur if:
+            # 1. getSpectrum() was called without first calling acquire().
+            # 2. acquire() was called, but the worker thread has not yet started
+            #    the acquisition..
+            # 3. acquire() was called, but the worker thread is not running.
+            # Situations 1 and 3 are errors. Situation 2 is normal. To prevent
+            # unnecessary errors, a short delay (5 seconds) is required here.
             self.log.debug("idle, waiting at most 5s for spectrum")
             timeout = 5
         return self._rQ.get(block, timeout)
