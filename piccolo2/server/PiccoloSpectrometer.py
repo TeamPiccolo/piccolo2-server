@@ -125,6 +125,13 @@ class AcquireTask(Task):
             raise TypeError("Dark must be True or False. {} is {}.".format(isDark, type(isDark)))
         self._dark = isDark
 
+    def __str__(self):
+        if self.dark:
+            type_str = "dark"
+        else:
+            type_str = "light"
+        return "{} {} spectrum at {} ms integration time".format(self.direction, type_str, self.integrationTime)
+
 class AutointegrateTask(Task):
     """Class to represent a request for an autointegration.
 
@@ -172,7 +179,7 @@ class AutointegrateTask(Task):
     def target(self, p):
         """Set the target peak level in the spectrum as a fraction of the saturation level.
 
-        The autointegraiton algorithm determines the integration time that will
+        The autointegration algorithm determines the integration time that will
         give a peak value in the spectrum that is close to the spectrometer's
         saturation level. Exactly how close can be customized by setting the
         target to some fraction of the saturation level. For example, setting
@@ -238,6 +245,14 @@ class AutointegrateTask(Task):
             raise ValueError("The integration time cannot be negative.")
         self._tmax = tFloat
 
+    def __str__(self):
+        t_max = self.maximumIntegrationTime
+        if t_max is None:
+            max_string = ""
+        else:
+            max_string = " and {} ms maximum integration time".format(t_max)
+        return "target {}% of saturation".format(self.targetPercent) + max_string
+
 class Result(object):
     pass
 
@@ -254,10 +269,13 @@ class AutointegrateResult(Result):
             return False
         else:
             return True
+    @success.setter
+    def success(self, S):
+        raise Exception('Success is a read-only property.')
 
     @property
     def errorMessage(self):
-        if self.success():
+        if self.success:
             raise Exception('There is no error message from autointegration because the autointegration algorithm worked and return time {} ms'.format(self.bestIntegrationTime))
         if len(self._error) == 0:
             raise Exception('The autointegration algorithm failed, but did not provide an error message.')
@@ -271,7 +289,7 @@ class AutointegrateResult(Result):
     @property
     def bestIntegrationTime(self):
         """Returns the best integration time in milliseconds."""
-        if not self.success():
+        if not self.success:
             raise Exception('Could not get the best integration time because the autointegration algorithm failed.')
         return self._t
     @bestIntegrationTime.setter
@@ -279,6 +297,12 @@ class AutointegrateResult(Result):
         if t < 0:
             raise Exception('The best integratipon time ({}) cannot be negative.'.format(t))
         self._t = t
+
+    def __str__(self):
+        if self.success:
+            return "{} ms is the best integration time.".format(self.bestIntegrationTime)
+        else:
+            return "Autointegration failed: {}".format(self.errorMessage)
 
 class SpectrometerThread(PiccoloWorkerThread):
     """Spectrometer worker thread object. The worker thread performs assigned
@@ -316,38 +340,60 @@ class SpectrometerThread(PiccoloWorkerThread):
                 # task queue.
                 self.log.info('Stopped worker thread for specrometer {}.'.format(self.name))
                 return
-            self.log.info("start recording for {} milliseconds".format(task.integrationTime))
-            self.busy.acquire()
 
-            # create new spectrum instance
-            spectrum = PiccoloSpectrum()
-            spectrum.setDark(task.dark)
-            if task.direction == 'upwelling':
-                spectrum.setUpwelling(True)
-            elif task.direction == 'downwelling':
-                spectrum.setUpwelling(False)
+            # Two types of tasks may be on the task queue: acquire or autointegrate.
+            if isinstance(task, AutointegrateTask):
+                self.log.debug('Performing an autointegrate task: {}'.format(task))
+                self.busy.acquire()
+                # Create the result object.
+                result = AutointegrateResult()
+                # Need to add support for a maximum integration time (at which
+                # the algorithm will fail).
+                t = None
+                try:
+                    t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
+                    result.bestIntegrationTime = t
+                except Exception as e:
+                    result.errorMessage = "{}".format(e)
+                self.busy.release()
+                self.results.put(result)
+            elif isinstance(task, AcquireTask):
+                self.log.debug("Performing an acquire task: {}".format(task))
+                self.log.info("Acquiring a spectrum with {} millisecond integration time.".format(task.integrationTime))
+                self.busy.acquire()
+
+                # create new spectrum instance
+                spectrum = PiccoloSpectrum()
+                spectrum.setDark(task.dark)
+                if task.direction == 'upwelling':
+                    spectrum.setUpwelling(True)
+                elif task.direction == 'downwelling':
+                    spectrum.setUpwelling(False)
+                else:
+                    raise Exception('Unsupported direction: "{}"'.format(task.direction))
+                spectrum['name'] = self.name
+
+                # record data
+                if self._spec==None:
+                    # If spectrometer is None, thenm simulate a spectrometer, for
+                    # testing purposes.
+                    time.sleep(task.integrationTime/1000.)
+                    pixels = [1]*100
+                else:
+                    # Have a real spectrometer, so acquire a real spectrum.
+                    self._spec.setIntegrationTime(task.integrationTime)
+                    spectrum.update(self._spec.getMetadata())
+                    self._spec.requestSpectrum()
+                    pixels = self._spec.readSpectrum()
+
+                spectrum.pixels = pixels
+
+                # write results to the result queue
+                self.results.put(spectrum)
+                self.busy.release()
             else:
-                raise Exception('Unsupported direction: "{}"'.format(task.direction))
-            spectrum['name'] = self.name
-
-            # record data
-            if self._spec==None:
-                # If spectrometer is None, thenm simulate a spectrometer, for
-                # testing purposes.
-                time.sleep(task.integrationTime/1000.)
-                pixels = [1]*100
-            else:
-                # Have a real spectrometer, so acquire a real spectrum.
-                self._spec.setIntegrationTime(task.integrationTime)
-                spectrum.update(self._spec.getMetadata())
-                self._spec.requestSpectrum()
-                pixels = self._spec.readSpectrum()
-
-            spectrum.pixels = pixels
-
-            # write results to the result queue
-            self.results.put(spectrum)
-            self.busy.release()
+                self.log.error('Unrecognised task type: {}'.format(type(task)))
+                self.tasks.put(None) # Terminate the thread.
 
 class PiccoloSpectrometer(PiccoloInstrument):
     """Class to communicate with a spectrometer."""
@@ -480,7 +526,41 @@ class PiccoloSpectrometer(PiccoloInstrument):
             # unnecessary errors, a short delay (5 seconds) is required here.
             self.log.debug("idle, waiting at most 5s for spectrum")
             timeout = 5
-        return self._rQ.get(block, timeout)
+        result = self._rQ.get(block, timeout)
+        if isinstance(result, PiccoloSpectrum):
+            return result
+        else:
+            # An error could occur if an aucointegration is requested, but then
+            # a spectrum is read (instead of an autointegration result).
+            raise Exception('Tried to get a spectrum, but found a {}: {}'.format(type(result), result))
+
+    def autointegrate(self):
+        """Determines the best integration time."""
+        if self._busy.locked():
+            self.log.warning("Spectrometer busy. Cannot autointegrate.".format())
+            return 'nok: already acquiring or autointegrating'
+
+        # Create an autointegrate task.
+        task = AutointegrateTask()
+        # Could set some parameters for the autointegration here, such as the
+        # "target" or the maximum integration time. For now, just use the defaults.
+
+        # Put the autointegrate task onto the task queue.
+        self._tQ.put(task)
+        return 'ok'
+
+    def getAutointegrateResult(self):
+        """Returns the best integration time."""
+        block=True
+        if self._busy.locked():
+            self.log.debug("busy, waiting until the autointegration procedure has completed")
+            timeout = None
+        else:
+            self.log.debug("idle, waiting at most 20s")
+            timeout = 20
+        result = self._rQ.get(block, timeout)
+        if isinstance(result, AutointegrateResult):
+            return result
 
 if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server
@@ -515,9 +595,26 @@ if __name__ == '__main__':
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
+    best = {}
+    print 'Determining best integration times...'
+    # This will fail if tested with "simulated" spectroemters.
+    for s in spectrometers:
+        serial = s.info()['serial']
+        s.autointegrate()
+        r = s.getAutointegrateResult()
+        if not r.success:
+            # Autointegration failed.
+            print "Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage)
+            sys.exit(1)
+        t = r.bestIntegrationTime
+        print 'Spectrometer {} integration time {} ms'.format(serial, t)
+        best[serial] = t
+
     print 'Starting acquisitions...'
     for i in range(len(spectrometers)):
-        spectrometers[i].acquire(milliseconds=(len(spectrometers)-i)*2000)
+        serial = spectrometers[i].info()['serial']
+        t = best[serial]
+        spectrometers[i].acquire(milliseconds=t)
 
     for s in spectrometers:
         info = s.info()
