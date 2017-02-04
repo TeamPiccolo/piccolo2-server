@@ -33,6 +33,7 @@ import time
 import threading
 from Queue import Queue
 import logging
+import sys
 
 class Task(object):
     pass
@@ -350,11 +351,13 @@ class SpectrometerThread(PiccoloWorkerThread):
                 # Need to add support for a maximum integration time (at which
                 # the algorithm will fail).
                 t = None
-                try:
-                    t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
-                    result.bestIntegrationTime = t
-                except Exception as e:
-                    result.errorMessage = "{}".format(e)
+#                try:
+                t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
+                result.bestIntegrationTime = t
+#                except Exception as e:
+                    # Get information about the exception.
+#                    (exception_type, exception_value, exception_traceback) = sys.exc_info()
+#                    result.errorMessage = "Exception: type {}, info {}, traceback {}".format(exception_type, exception_value, exception_traceback.format_exception())
                 self.busy.release()
                 self.results.put(result)
             elif isinstance(task, AcquireTask):
@@ -566,6 +569,7 @@ if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server
     # It is not used during normal operation.
     from piccoloLogging import *
+    from matplotlib import pyplot as plt
 
     have_hardware = False # True if the hardware drivers are available
     try:
@@ -630,7 +634,10 @@ if __name__ == '__main__':
     for s in spectrometers:
         spec = s.getSpectrum()
         print "Got a spectrum with {} pixels".format(spec.getNumberOfPixels())
+        plt.plot(spec.pixels)
+        plt.show()
         spectra.append(spec)
 #    spectra.write()
+
 
     time.sleep(0.5)
