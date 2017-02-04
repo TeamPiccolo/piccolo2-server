@@ -36,6 +36,13 @@ import logging
 import sys
 
 class Task(object):
+    """Instructions for a specific action which the spectrometer is to perform.
+
+    Currently the spectrometer can perform two types of task: autointegrate
+    and acquire. These task types are subclasses of Task.
+
+    Every Task produces a corresponding Result, defined in the Result class.
+    """
     pass
 
 class AcquireTask(Task):
@@ -341,62 +348,77 @@ class SpectrometerThread(PiccoloWorkerThread):
                 # task queue.
                 self.log.info('Stopped worker thread for specrometer {}.'.format(self.name))
                 return
+            self._performTask(task)
 
-            # Two types of tasks may be on the task queue: acquire or autointegrate.
-            if isinstance(task, AutointegrateTask):
-                self.log.debug('Performing an autointegrate task: {}'.format(task))
-                self.busy.acquire()
-                # Create the result object.
-                result = AutointegrateResult()
-                # Need to add support for a maximum integration time (at which
-                # the algorithm will fail).
-                t = None
+    def _performTask(self, task):
+        if not isinstance(task, Task):
+            raise TypeError('Unrecognized task type {}'.format(type(task)))
+
+        # The spectrometer can only perform one task at a time. What should
+        # happen if it is already performing a task (it is "locked"). For now,
+        # raise an Exception.
+        if self.busy.locked():
+            raise Exception('Cannot perform task {} because the spectrometer is locked.')
+        self.busy.acquire() # This command locks the spectrometer. ("acquire" here refers to the lock, not the spectrometer!)
+
+        # Check what the type of the task is, then perform it.
+        if type(task) is AcquireTask:
+            self._performAcquireTask(task)
+        elif type(task) is AutointegrateTask:
+            self._performAutointegrateTask(task)
+
+        # The task has completed, so unlock the spectrometer. The result of the
+        # task should now be on the results queue waiting to be picked up.
+        self.busy.release()
+
+    def _performAutointegrateTask(self, task):
+        self.log.debug('Performing an autointegrate task: {}'.format(task))
+        # Create the result object.
+        result = AutointegrateResult()
+        # Need to add support for a maximum integration time (at which
+        # the algorithm will fail).
+        t = None
 #                try:
-                t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
-                result.bestIntegrationTime = t
+        t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
+        result.bestIntegrationTime = t
 #                except Exception as e:
-                    # Get information about the exception.
+            # Get information about the exception.
 #                    (exception_type, exception_value, exception_traceback) = sys.exc_info()
 #                    result.errorMessage = "Exception: type {}, info {}, traceback {}".format(exception_type, exception_value, exception_traceback.format_exception())
-                self.busy.release()
-                self.results.put(result)
-            elif isinstance(task, AcquireTask):
-                self.log.debug("Performing an acquire task: {}".format(task))
-                self.log.info("Acquiring a spectrum with {} millisecond integration time.".format(task.integrationTime))
-                self.busy.acquire()
+        self.results.put(result)
 
-                # create new spectrum instance
-                spectrum = PiccoloSpectrum()
-                spectrum.setDark(task.dark)
-                if task.direction == 'upwelling':
-                    spectrum.setUpwelling(True)
-                elif task.direction == 'downwelling':
-                    spectrum.setUpwelling(False)
-                else:
-                    raise Exception('Unsupported direction: "{}"'.format(task.direction))
-                spectrum['name'] = self.name
+    def _performAcquireTask(self, task):
+        self.log.debug("Performing an acquire task: {}".format(task))
+        self.log.info("Acquiring a spectrum with {} millisecond integration time.".format(task.integrationTime))
 
-                # record data
-                if self._spec==None:
-                    # If spectrometer is None, thenm simulate a spectrometer, for
-                    # testing purposes.
-                    time.sleep(task.integrationTime/1000.)
-                    pixels = [1]*100
-                else:
-                    # Have a real spectrometer, so acquire a real spectrum.
-                    self._spec.setIntegrationTime(task.integrationTime)
-                    spectrum.update(self._spec.getMetadata())
-                    self._spec.requestSpectrum()
-                    pixels = self._spec.readSpectrum()
+        # create new spectrum instance
+        spectrum = PiccoloSpectrum()
+        spectrum.setDark(task.dark)
+        if task.direction == 'upwelling':
+            spectrum.setUpwelling(True)
+        elif task.direction == 'downwelling':
+            spectrum.setUpwelling(False)
+        else:
+            raise Exception('Unsupported direction: "{}"'.format(task.direction))
+        spectrum['name'] = self.name
 
-                spectrum.pixels = pixels
+        # record data
+        if self._spec==None:
+            # If spectrometer is None, thenm simulate a spectrometer, for
+            # testing purposes.
+            time.sleep(task.integrationTime/1000.)
+            pixels = [1]*100
+        else:
+            # Have a real spectrometer, so acquire a real spectrum.
+            self._spec.setIntegrationTime(task.integrationTime)
+            spectrum.update(self._spec.getMetadata())
+            self._spec.requestSpectrum()
+            pixels = self._spec.readSpectrum()
 
-                # write results to the result queue
-                self.results.put(spectrum)
-                self.busy.release()
-            else:
-                self.log.error('Unrecognised task type: {}'.format(type(task)))
-                self.tasks.put(None) # Terminate the thread.
+        spectrum.pixels = pixels
+
+        # write results to the result queue
+        self.results.put(spectrum)
 
 class PiccoloSpectrometer(PiccoloInstrument):
     """Class to communicate with a spectrometer."""
