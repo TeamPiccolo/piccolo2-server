@@ -187,6 +187,46 @@ class PiccoloThread(PiccoloWorkerThread):
                     pattern = [(True,True),(False,True),(False,False),(True,False)] # Upwelling dark, upwelling light, downwelling light, downwelling dark.
                 else:
                     pattern = [(False,True),(False,False)] # Upwelling light, downwelling light.
+
+                # autointegrate2 branch:
+                # If this is the first spectrum in the batch then adjust the integration times.
+                if n == 1:
+                    self.log.info('This is the first sequence in the batch, so will autointegrate first. Current integration times are: {}'.format(integrationTime))
+                    spectrometer_names_list = [ s for s in integrationTime['upwelling'] ]
+                    # Open the upwelling shutter.
+                    self._shutters['upwelling'].openShutter()
+                    for s in spectrometer_names_list:
+                        self.log.debug('Autointegrate {}'.format(s))
+                        time.sleep(2)
+                        self._spectrometers[s].autointegrate()
+                        time.sleep(2)
+                        r = self._spectrometers[s].getAutointegrateResult()
+                        if r.success:
+                            t = r.bestIntegrationTime
+                            self.log.info('Autointegration upwelling {} {} ms'.format(s, t))
+                            integrationTime['upwelling'][s] = t
+                        else:
+                            # Autointegration failed.
+                            log.info("Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage))
+
+                    self._shutters['upwelling'].closeShutter()
+                    self._shutters['downwelling'].openShutter()
+                    for s in spectrometer_names_list:
+                        self.log.debug('Autointegrate {}'.format(s))
+                        time.sleep(2)
+                        self._spectrometers[s].autointegrate()
+                        time.sleep(2)
+                        r = self._spectrometers[s].getAutointegrateResult()
+                        if r.success:
+                            t = r.bestIntegrationTime
+                            self.log.info('Autointegration upwelling {} {} ms'.format(s, t))
+                            integrationTime['downwelling'][s] = t
+                        else:
+                            # Autointegration failed.
+                            log.info("Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage))
+                    self._shutters['downwelling'].closeShutter()
+                    self.log.info('The integration times have changed to: {}'.format(integrationTime))                    
+
                 dark = False
                 for p in pattern:
                     if p[1]:

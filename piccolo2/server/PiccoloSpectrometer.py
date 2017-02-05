@@ -591,8 +591,8 @@ class PiccoloSpectrometer(PiccoloInstrument):
             self.log.debug("busy, waiting until the autointegration procedure has completed")
             timeout = None
         else:
-            self.log.debug("idle, waiting at most 20s")
-            timeout = 20
+            self.log.debug("idle, waiting at most 60s")
+            timeout = 60
         result = self._rQ.get(block, timeout)
         if isinstance(result, AutointegrateResult):
             return result
@@ -601,7 +601,7 @@ if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server
     # It is not used during normal operation.
     from piccoloLogging import *
-    from matplotlib import pyplot as plt
+#    from matplotlib import pyplot as plt
 
     have_hardware = False # True if the hardware drivers are available
     try:
@@ -666,9 +666,9 @@ if __name__ == '__main__':
     for s in spectrometers:
         spec = s.getSpectrum()
         print "Got a spectrum with {} pixels".format(spec.getNumberOfPixels())
-        plt.plot(spec.pixels)
-        plt.show()
-        spectra.append(spec)
+#        plt.plot(spec.pixels)
+#        plt.show()
+#        spectra.append(spec)
 #    spectra.write()
 
 
