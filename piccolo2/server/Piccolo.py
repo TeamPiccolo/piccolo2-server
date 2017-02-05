@@ -335,6 +335,20 @@ class Piccolo(PiccoloInstrument):
         """
         self.setIntegrationTime(shutter, spectrometer, milliseconds)
 
+    def setIntegrationTimeAuto(self, max=None):
+        """Sets the integration time automatically.
+
+        The max parameter is the maximum integration time (in milliseconds)
+        which may be set on the spectrometer. Autointegration will never
+        return an integration time longer than this. If it is not possible to
+        find an integration time less than max, then an error will occur and
+        autointegration will fail.
+
+        :param max: the maximum integration time in milliseconds
+        """
+        pass
+
+
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
 
