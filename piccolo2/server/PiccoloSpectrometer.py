@@ -29,6 +29,9 @@ __all__ = ['PiccoloSpectrometer']
 from piccolo2.PiccoloSpectra import *
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloWorkerThread import PiccoloWorkerThread
+from piccolo2.hardware.spectrometers import AutointegrationNoLightError
+from piccolo2.hardware.spectrometers import AutointegrationUnstableLightError
+from piccolo2.hardware.spectrometers import AutointegrationExceededMaximumIntegrationTimeError
 import time
 import threading
 from Queue import Queue
@@ -344,8 +347,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             # wait for a new task from the task queue
             task = self.tasks.get()
             if task == None:
-                # The worker thread can be stopped by putting a None onto the
-                # task queue.
+                # The worker thread can be stopped by putting a None onto the task queue.
                 self.log.info('Stopped worker thread for specrometer {}.'.format(self.name))
                 return
             self._performTask(task)
@@ -355,8 +357,8 @@ class SpectrometerThread(PiccoloWorkerThread):
             raise TypeError('Unrecognized task type {}'.format(type(task)))
 
         # The spectrometer can only perform one task at a time. What should
-        # happen if it is already performing a task (it is "locked"). For now,
-        # raise an Exception.
+        # happen if it is already performing a task? For now, if the
+        # spectrometer is locked, just raise an Exception.
         if self.busy.locked():
             raise Exception('Cannot perform task {} because the spectrometer is locked.')
         self.busy.acquire() # This command locks the spectrometer. ("acquire" here refers to the lock, not the spectrometer!)
@@ -378,13 +380,19 @@ class SpectrometerThread(PiccoloWorkerThread):
         # Need to add support for a maximum integration time (at which
         # the algorithm will fail).
         t = None
-#                try:
-        t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
-        result.bestIntegrationTime = t
-#                except Exception as e:
+        try:
+            t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
+            result.bestIntegrationTime = t
+        except AutointegrationNoLightError as e:
+            raise
+        except AutointegrationUnstableLightError as e:
+            raise
+        except AutointegrationExceededMaximumIntegrationTimeError as e:
+            raise
+        except Exception as e:
             # Get information about the exception.
-#                    (exception_type, exception_value, exception_traceback) = sys.exc_info()
-#                    result.errorMessage = "Exception: type {}, info {}, traceback {}".format(exception_type, exception_value, exception_traceback.format_exception())
+            self.log.exception('An unanticipated error occured during autointegration on spectroemter {}.'.format(self._spec.info()['serial']))
+            raise
         self.results.put(result)
 
     def _performAcquireTask(self, task):
