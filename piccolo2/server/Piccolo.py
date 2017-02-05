@@ -304,9 +304,21 @@ class Piccolo(PiccoloInstrument):
         return self._shutters
 
     def setIntegrationTime(self,shutter=None,spectrometer=None,milliseconds=1000.):
-        """set the integration time
+        """Set the integration time manually.
 
-        :param shutter: the shutter name
+        Integration times can be adjusted for each direction (upwelling and
+        downwelling) and each spectrometer. On Piccolo instruments with
+        one spectrometer, there are two separate integration times: upwelling
+        and downwelling. On Piccolo instruments with two spectrometers, there
+        will be four integration times (two spectrometers times two directions).
+
+        Dark spectra are recorded at the same integration time as their
+        corresponding light spectra.
+
+        This functions sets the integration times manually. An alternative is to
+        set them automatically.
+
+        :param shutter: the shutter name ("direction"), 'upwelling' or 'downwelling'
         :param spectrometer: the spectrometer name
         :param milliseconds: the integration time in milliseconds"""
         if shutter not in self.getShutterList():
@@ -315,6 +327,13 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         self._integrationTimes[shutter][spectrometer] = milliseconds
         return 'ok'
+
+    def setIntegrationTimeManual(self, shutter=None, spectrometer=None, milliseconds=1000.):
+        """Set the integration time manually.
+
+        See description of the setIntegrationTime function.
+        """
+        self.setIntegrationTime(shutter, spectrometer, milliseconds)
 
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
