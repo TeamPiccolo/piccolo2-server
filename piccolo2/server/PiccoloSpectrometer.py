@@ -384,14 +384,16 @@ class SpectrometerThread(PiccoloWorkerThread):
             t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
             result.bestIntegrationTime = t
         except AutointegrationNoLightError as e:
-            raise
+            # The exception will contain a message with information about why
+            # autointegration failed. Copy this message into the result object.
+            result.errorMessage = e.message
         except AutointegrationUnstableLightError as e:
-            raise
+            result.errorMessage = e.message
         except AutointegrationExceededMaximumIntegrationTimeError as e:
-            raise
+            result.errorMessage = e.message
         except Exception as e:
             # Get information about the exception.
-            self.log.exception('An unanticipated error occured during autointegration on spectroemter {}.'.format(self._spec.info()['serial']))
+            self.log.exception('An unanticipated error occured during autointegration on spectroemter {}.'.format(self._spec.serialNumber))
             raise
         self.results.put(result)
 
