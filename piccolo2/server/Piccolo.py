@@ -44,7 +44,7 @@ class PiccoloThread(PiccoloWorkerThread):
     def __init__(self,name,shutters,spectrometers,busy,paused,tasks,results):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
-        
+
         self._paused = paused
         self._shutters = shutters
         self._spectrometers = spectrometers
@@ -58,7 +58,7 @@ class PiccoloThread(PiccoloWorkerThread):
             cmd = self.tasks.get(block=block)
         except Empty:
             return
-        
+
         self.log.debug(cmd)
 
         if cmd == None:
@@ -99,7 +99,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.log.warn('already recording data')
                 return
             return cmd
-        
+
     def getCounter(self,key):
         if key not in self._outCounter:
             self._outCounter[key] = 0
@@ -117,14 +117,14 @@ class PiccoloThread(PiccoloWorkerThread):
         else:
             direction = 'downwelling'
         self.log.info("Record {0} {1} spectra".format(darkStr,direction))
-        
+
         # open/close shutters as required
         for shutter in self._shutters:
             if not dark and shutter == direction:
                 self._shutters[shutter].openShutter()
             else:
                 self._shutters[shutter].closeShutter()
-        
+
         for s in integrationTime:
             self._spectrometers[s].acquire(milliseconds=integrationTime[s],dark=dark,upwelling=upwelling)
 
@@ -132,7 +132,7 @@ class PiccoloThread(PiccoloWorkerThread):
         spectra = []
         for s in integrationTime:
             spectra.append(self._spectrometers[s].getSpectrum())
-            
+
         self._shutters[direction].closeShutter()
         return spectra
 
@@ -153,11 +153,12 @@ class PiccoloThread(PiccoloWorkerThread):
 
             # start recording
             self.log.info("start recording {}".format(nCycles))
-            self.busy.acquire()
+            self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
-            n = 0
+            n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
+            # Work out the output filename.
             prefix = os.path.join(outDir,'{0:04d}_'.format(self.getCounter(outDir)))
-            dark = False
+            dark = False # Default is "light"?
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
                 spectra.prefix = prefix
@@ -178,11 +179,14 @@ class PiccoloThread(PiccoloWorkerThread):
                         dark = True
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
-                # only record dark spectra at the beginning or end
-                if n==1 or n==nCycles or dark:
-                    pattern = [(True,True),(False,True),(False,False),(True,False)]
+                # Define the pattern to use. The pattern is a list of tuples
+                # (a, b). a is the type of the spectrum, True for "dark",
+                # False for "light". b is the direction, True for "upwelling",
+                # False for "downwelling".
+                if n==1 or n==nCycles or dark: # Only record dark spectra at the beginning or end of a batch.
+                    pattern = [(True,True),(False,True),(False,False),(True,False)] # Upwelling dark, upwelling light, downwelling light, downwelling dark.
                 else:
-                    pattern = [(False,True),(False,False)]
+                    pattern = [(False,True),(False,False)] # Upwelling light, downwelling light.
                 dark = False
                 for p in pattern:
                     if p[1]:
@@ -213,7 +217,7 @@ class PiccoloOutput(threading.Thread):
 
     def __init__(self,name,datadir,spectra,clobber=True,daemon=True,split=True):
         assert isinstance(spectra,Queue)
-        
+
         threading.Thread.__init__(self)
         self.name = name
         self.daemon = daemon
@@ -242,7 +246,7 @@ class PiccoloOutput(threading.Thread):
                 spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
             except RuntimeError, e:
                 self.log.error('writing {} to {}: {}'.format(self._datadir.datadir,spectra.outName,e))
-            
+
 
 class Piccolo(PiccoloInstrument):
     """piccolo server instrument
@@ -264,7 +268,7 @@ class Piccolo(PiccoloInstrument):
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
         self._datadir = datadir
-        
+
         self._spectraCache = (None,None)
 
         self._spectrometers = spectrometers.keys()
@@ -314,7 +318,7 @@ class Piccolo(PiccoloInstrument):
 
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
-        
+
         :param shutter: the shutter name
         :param spectrometer: the spectrometer name"""
         if shutter not in self.getShutterList():
@@ -335,7 +339,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok: already recording'
         self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
         return 'ok'
-    
+
     def dark(self):
         """record a dark spectrum"""
         if not self._busy.locked():
@@ -353,7 +357,7 @@ class Piccolo(PiccoloInstrument):
     def status(self):
         """return status of shutter
 
-        :return: (busy,paused) 
+        :return: (busy,paused)
         :rtype:  (bool, bool)"""
 
         busy = self._busy.locked()
@@ -412,7 +416,7 @@ class Piccolo(PiccoloInstrument):
                 raise OSError, 'setting date to \'{}\': {}'.format(clock,cmdPipe.stderr.read())
             return cmdPipe.stdout.read()
         return ''
-        
+
     def isMountedDataDir(self):
         """check if datadir is mounted"""
         return self._datadir.isMounted
