@@ -207,7 +207,7 @@ class PiccoloThread(PiccoloWorkerThread):
                             integrationTime['upwelling'][s] = t
                         else:
                             # Autointegration failed.
-                            self.log.info("Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage))
+                            self.log.info("Autointegration on spectrometer {} failed: {}".format(s, r.errorMessage))
 
                     self._shutters['upwelling'].closeShutter()
                     self._shutters['downwelling'].openShutter()
