@@ -32,13 +32,13 @@ from PiccoloScheduler import PiccoloScheduler
 
 class PiccoloDispatcher(threading.Thread):
     """piccolo dispatcher class
-    
+
     The dispatcher sits at the centre and takes instructions from the
-    controllers and passes them on to the instruments. 
+    controllers and passes them on to the instruments.
     """
 
     DELAY = 0.1
-    
+
     def __init__(self,daemon=False):
         """
         :param daemon: whether the dispatcher thread should be daemonised. When
@@ -74,12 +74,12 @@ class PiccoloDispatcher(threading.Thread):
 
     def registerController(self,controller):
         """register a controller
-        
+
         :param controller: instance of a controller
         :type controller: PiccoloController"""
         #assert isinstance(controller,PiccoloController)
         self._clients.append((controller.taskQ,controller.doneQ))
-        
+
     def getComponentList(self):
         """get list of registered components
         :returns: list of components"""
@@ -93,7 +93,10 @@ class PiccoloDispatcher(threading.Thread):
         :param kwds: dictionary containing command parameters
         :returns: result of running command"""
 
-        self.log.debug('invoke {0} {1} {2}'.format(component,command,str(kwds)))
+        # Commented out the line below because it causes too many writes
+        # to log files when debug-level logging is turned on (in the server
+        # configuration file).
+        # self.log.debug('invoke {0} {1} {2}'.format(component,command,str(kwds)))
 
         if component not in self._components:
             raise KeyError, 'unkown component {0}'.format(component)
@@ -111,7 +114,7 @@ class PiccoloDispatcher(threading.Thread):
         except:
             self.log.error('{0} {1}: {2}'.format(task[1],task[0],sys.exc_info()[1].message))
             result = 'nok',sys.exc_info()[1].message
-        return result        
+        return result
 
     def run(self):
         """processing loop
