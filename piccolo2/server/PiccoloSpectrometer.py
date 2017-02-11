@@ -394,7 +394,7 @@ class SpectrometerThread(PiccoloWorkerThread):
         except Exception as e:
             # Get information about the exception.
             self.log.exception('An unanticipated error occured during autointegration on spectroemter {}.'.format(self._spec.serialNumber))
-            raise
+            result.errorMessage = "Autointegration failed for an unknown reason."
         self.results.put(result)
 
     def _performAcquireTask(self, task):
