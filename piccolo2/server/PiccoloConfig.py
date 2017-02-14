@@ -63,7 +63,7 @@ defaultCfgStr = """
 # configure output options
 [output]
   # overwrite output files when clobber is set to True
-  clobber = boolean(default=True)
+  clobber = boolean(default=False)
   # write separate files containing only dark and light spectra when split is 
   # set to True
   split = boolean(default=True)

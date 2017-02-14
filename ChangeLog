@@ -1,4 +1,10 @@
 2017-02-14 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: check output dir if files already exist, avoid
+   overwriting them, report status
+ * piccolo2/server/PiccoloConfig.py: do not clobber files by default
+ * piccolo2/server/PiccoloDataDir.py: add method to get next available counter
+
+2017-02-14 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: use new status class to pass on status
 
 2016-09-21 Magnus Hagdorn

@@ -126,6 +126,19 @@ class PiccoloDataDir(object):
         fileList.sort()
         return fileList
 
+    def getNextCounter(self,path,pattern='*.pico*'):
+        nextCounter = 0
+        for f in self.getFileList(path,pattern):
+            f = os.path.basename(f).split('_')[0]
+            try:
+                m = int(f)
+            except:
+                continue
+            nextCounter = max(nextCounter,m)
+        if nextCounter>0:
+            nextCounter = nextCounter + 1
+        return nextCounter
+    
     def getFileData(self,fname):
         return open(self.join(fname),'r').read()
 

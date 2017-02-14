@@ -42,14 +42,16 @@ class PiccoloThread(PiccoloWorkerThread):
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,shutters,spectrometers,busy,paused,tasks,results):
+    def __init__(self,name,datadir,shutters,spectrometers,busy,paused,tasks,results,file_incremented):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
 
+        self._datadir = datadir
         self._paused = paused
         self._shutters = shutters
         self._spectrometers = spectrometers
         self._outCounter = {}
+        self._file_incremented = file_incremented
 
     def _wait(self):
         time.sleep(0.2)
@@ -103,7 +105,12 @@ class PiccoloThread(PiccoloWorkerThread):
 
     def getCounter(self,key):
         if key not in self._outCounter:
-            self._outCounter[key] = 0
+            self._outCounter[key] = self._datadir.getNextCounter(key)
+            if self._outCounter[key] > 0:
+                self.log.warn('spectra index set to %d'%self._outCounter[key])
+                self._file_incremented.set()
+            else:
+                self._file_incremented.clear()
         else:
             self._outCounter[key] += 1
         return self._outCounter[key]
@@ -242,11 +249,11 @@ class PiccoloOutput(threading.Thread):
                 self.log.info('shutting down')
                 return
 
-            self.log.info('writing {} to {}'.format(self._datadir.datadir,spectra.outName))
+            self.log.info('writing {} to {}'.format(spectra.outName,self._datadir.datadir))
             try:
                 spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
             except RuntimeError, e:
-                self.log.error('writing {} to {}: {}'.format(self._datadir.datadir,spectra.outName,e))
+                self.log.error('writing {} to {}: {}'.format(spectra.outName,self._datadir.datadir,e))
 
 
 class Piccolo(PiccoloInstrument):
@@ -292,7 +299,8 @@ class Piccolo(PiccoloInstrument):
         self._paused = threading.Lock()
         self._tQ = Queue()
         self._rQ = Queue()
-        self._worker = PiccoloThread(name,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ)
+        self._file_incremented = threading.Event()
+        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ, self._file_incremented)
         self._worker.start()
 
         # handling the output thread
@@ -400,6 +408,7 @@ class Piccolo(PiccoloInstrument):
 
         self._status.busy = self._busy.locked()
         self._status.paused = self._paused.locked()
+        self._status.file_incremented = self._file_incremented.isSet()
 
         return self._status.encode()
 
