@@ -26,6 +26,7 @@ from PiccoloInstrument import PiccoloInstrument
 from PiccoloDataDir import PiccoloDataDir
 from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
+from piccolo2.PiccoloStatus import PiccoloStatus
 import socket
 import psutil
 import subprocess
@@ -276,6 +277,9 @@ class Piccolo(PiccoloInstrument):
         self._shutters = shutters.keys()
         self._shutters.sort()
 
+        self._status = PiccoloStatus()
+        self._status.connected = True
+        
         # integration times
         self._integrationTimes = {}
         for shutter in self.getShutterList():
@@ -386,17 +390,18 @@ class Piccolo(PiccoloInstrument):
 
     def pause(self):
         self._tQ.put('pause')
-
+        
     def status(self):
         """return status of shutter
 
         :return: (busy,paused)
         :rtype:  (bool, bool)"""
 
-        busy = self._busy.locked()
-        paused = self._paused.locked()
 
-        return (busy,paused)
+        self._status.busy = self._busy.locked()
+        self._status.paused = self._paused.locked()
+
+        return self._status.encode()
 
     def info(self):
         """get info

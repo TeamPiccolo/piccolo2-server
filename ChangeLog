@@ -1,3 +1,6 @@
+2017-02-14 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: use new status class to pass on status
+
 2016-09-21 Magnus Hagdorn
  * Source/server/etc/piccolo.cfg: listen for piccolo instructions on any
    network interface
