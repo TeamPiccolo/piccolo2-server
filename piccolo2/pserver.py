@@ -25,13 +25,10 @@ import os
 
 HAVE_PICCOLO_DRIVER = True
 try:
-    import piccolo2.hardware
-except:
-    HAVE_PICCOLO_DRIVER = False
-
-if HAVE_PICCOLO_DRIVER:
     from piccolo2.hardware import shutters as piccolo_shutters
     from piccolo2.hardware import spectrometers as piccolo_spectrometers
+except:
+    HAVE_PICCOLO_DRIVER = False
 
 def piccolo_server(serverCfg):
 
