@@ -1,3 +1,8 @@
+2017-02-22 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: use messages to notify client that the
+   integration time has changed
+ * piccolo2/server/PiccoloMessages.py: new module to handle per client messages
+
 2017-02-14 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: check output dir if files already exist, avoid
    overwriting them, report status

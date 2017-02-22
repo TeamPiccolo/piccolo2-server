@@ -26,6 +26,7 @@ from PiccoloInstrument import PiccoloInstrument
 from PiccoloDataDir import PiccoloDataDir
 from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
+from PiccoloMessages import PiccoloMessages
 from piccolo2.PiccoloStatus import PiccoloStatus
 import socket
 import psutil
@@ -286,6 +287,8 @@ class Piccolo(PiccoloInstrument):
 
         self._status = PiccoloStatus()
         self._status.connected = True
+
+        self._messages = PiccoloMessages()
         
         # integration times
         self._integrationTimes = {}
@@ -307,6 +310,21 @@ class Piccolo(PiccoloInstrument):
         self._output = PiccoloOutput(name,self._datadir,self._rQ,clobber=clobber,split=split)
         self._output.start()
 
+    def getListenerID(self):
+        """get a listener ID for use with messages"""
+        return self._messages.newListener()
+
+    def removeListener(self,listener=None):
+        """remove a listener"""
+        try:
+            self._messages.removeListener(listener)
+        except:
+            self.log.warning('could not remove listener %s'%str(listener))
+
+    def getMessage(self,listener=None):
+        """get a message"""
+        return self._messages.getMessage(listener)
+            
     def getSpectrometerList(self):
         """get list of attached spectrometers"""
         return self._spectrometers
@@ -337,6 +355,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok','unknown shutter: {}'.format(shutter)
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
         self._integrationTimes[shutter][spectrometer] = milliseconds
         return 'ok'
 
@@ -399,7 +418,7 @@ class Piccolo(PiccoloInstrument):
     def pause(self):
         self._tQ.put('pause')
         
-    def status(self):
+    def status(self,listener=None):
         """return status of shutter
 
         :return: (busy,paused)
@@ -410,6 +429,11 @@ class Piccolo(PiccoloInstrument):
         self._status.paused = self._paused.locked()
         self._status.file_incremented = self._file_incremented.isSet()
 
+        try:
+            self._status.new_message = self._messages.status(listener)
+        except:
+            self._status.new_message = False
+                
         return self._status.encode()
 
     def info(self):
