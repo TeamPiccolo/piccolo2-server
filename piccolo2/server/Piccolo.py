@@ -423,7 +423,9 @@ class Piccolo(PiccoloInstrument):
             if results.success:
                 self.setIntegrationTime(shutter,spectrometer,results.bestIntegrationTime)
             else:
-                self.log.warning('Autointegration for %s %s failed'%(spectrometer,shutter))
+                msg='Autointegration for %s %s failed'%(spectrometer,shutter)
+                self._messages.warning(msg)
+                self.log.warning(msg)
 
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
@@ -476,6 +478,10 @@ class Piccolo(PiccoloInstrument):
         self._status.paused = self._paused.locked()
         self._status.file_incremented = self._file_incremented.isSet()
 
+        if self._status.file_incremented:
+            self._messages.warning("avoided overwriting existing file by incrementing file number")
+            self._file_incremented.clear()
+        
         try:
             self._status.new_message = self._messages.status(listener)
         except:

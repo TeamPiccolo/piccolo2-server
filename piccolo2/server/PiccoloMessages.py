@@ -40,6 +40,14 @@ class PiccoloMessages(object):
         for l in self._messages:
             self._messages[l].add(message)
 
+    def warning(self,message):
+        for l in self._messages:
+            self._messages[l].add('warning|%s'%message)
+            
+    def error(self,message):
+        for l in self._messages:
+            self._messages[l].add('error|%s'%message)
+            
     def status(self,listener):
         return len(self._messages[listener])>0
 

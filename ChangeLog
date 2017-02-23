@@ -1,4 +1,9 @@
 2017-02-23 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: send warning message when autointegration fails
+   or when file clobbering was avoided
+ * piccolo2/server/PiccoloMessages.py: added warning and error messages
+
+2017-02-23 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: add new command to run autointegration
 
 2017-02-22 Magnus Hagdorn
