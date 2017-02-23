@@ -1,4 +1,8 @@
 2017-02-23 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: make checkAutoIntegrationResults optionally 
+   blocking
+
+2017-02-23 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: send warning message when autointegration fails
    or when file clobbering was avoided
  * piccolo2/server/PiccoloMessages.py: added warning and error messages

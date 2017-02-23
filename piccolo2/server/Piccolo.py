@@ -414,10 +414,15 @@ class Piccolo(PiccoloInstrument):
         self._tQ.put('auto')
         return 'ok'
 
-    def checkAutoIntegrationResults(self):
+    def checkAutoIntegrationResults(self,block=False,timeout=30.):
+        """check autointegration results
+    
+        :param block: wait until results are available - default do not block
+        :param timeout: when block is True wait at most timeout seconds
+        """
         while True:
             try:
-                shutter,spectrometer,results = self._aQ.get(block=False)
+                shutter,spectrometer,results = self._aQ.get(block=block,timeout=timeout)
             except Empty:
                 return
             if results.success:
