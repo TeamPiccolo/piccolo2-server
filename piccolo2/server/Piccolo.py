@@ -43,7 +43,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,datadir,shutters,spectrometers,busy,paused,tasks,results,file_incremented):
+    def __init__(self,name,datadir,shutters,spectrometers,busy,paused,tasks,results,autoResults,file_incremented):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
 
@@ -52,6 +52,7 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters = shutters
         self._spectrometers = spectrometers
         self._outCounter = {}
+        self._autoResults = autoResults
         self._file_incremented = file_incremented
 
     def _wait(self):
@@ -97,6 +98,11 @@ class PiccoloThread(PiccoloWorkerThread):
                         self.log.warn('acquisition paused')
         elif cmd == 'dark':
             return cmd
+        elif cmd == 'auto':
+            if self.busy.locked():
+                self.log.warn('already recording data')
+                return
+            return cmd
         else:
             assert len(cmd)==4
             if self.busy.locked():
@@ -116,6 +122,22 @@ class PiccoloThread(PiccoloWorkerThread):
             self._outCounter[key] += 1
         return self._outCounter[key]
 
+    def autoIntegrate(self):
+        # close all shutters
+        for shutter in self._shutters:
+            self._shutters[shutter].closeShutter()
+        for shutter in self._shutters:
+            self._shutters[shutter].openShutter()
+            # start autointegration
+            for s in self._spectrometers:
+                self._spectrometers[s].autointegrate()
+            self._wait()
+            # get results
+            for s in self._spectrometers:
+                r=self._spectrometers[s].getAutointegrateResult()
+                self._autoResults.put((shutter,s,r))
+            self._shutters[shutter].closeShutter()
+    
     def record(self,integrationTime,dark=False,upwelling=False):
         if dark:
             darkStr = 'dark'
@@ -153,6 +175,13 @@ class PiccoloThread(PiccoloWorkerThread):
                 continue
             elif task == 'shutdown':
                 return
+            elif task == 'auto':
+                self.log.info("start autointegration")
+                self.busy.acquire()
+                self.autoIntegrate()
+                self.busy.release()
+                self.log.info("finished autointegration")
+                continue
             elif len(task) == 4:
                 # get task
                 (integrationTime,outDir,nCycles,delay) = task
@@ -302,8 +331,9 @@ class Piccolo(PiccoloInstrument):
         self._paused = threading.Lock()
         self._tQ = Queue()
         self._rQ = Queue()
+        self._aQ = Queue()
         self._file_incremented = threading.Event()
-        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ, self._file_incremented)
+        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
         self._worker.start()
 
         # handling the output thread
@@ -377,8 +407,23 @@ class Piccolo(PiccoloInstrument):
 
         :param max: the maximum integration time in milliseconds
         """
-        pass
 
+        if self._busy.locked():
+            self.log.warning("already recording")
+            return 'nok: already recording'
+        self._tQ.put('auto')
+        return 'ok'
+
+    def checkAutoIntegrationResults(self):
+        while True:
+            try:
+                shutter,spectrometer,results = self._aQ.get(block=False)
+            except Empty:
+                return
+            if results.success:
+                self.setIntegrationTime(shutter,spectrometer,results.bestIntegrationTime)
+            else:
+                self.log.warning('Autointegration for %s %s failed'%(spectrometer,shutter))
 
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
@@ -425,6 +470,8 @@ class Piccolo(PiccoloInstrument):
         :rtype:  (bool, bool)"""
 
 
+        self.checkAutoIntegrationResults()
+        
         self._status.busy = self._busy.locked()
         self._status.paused = self._paused.locked()
         self._status.file_incremented = self._file_incremented.isSet()
