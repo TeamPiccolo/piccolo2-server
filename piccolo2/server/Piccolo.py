@@ -420,14 +420,23 @@ class Piccolo(PiccoloInstrument):
         :param block: wait until results are available - default do not block
         :param timeout: when block is True wait at most timeout seconds
         """
+        haveResults=False
+        success=True
         while True:
             try:
                 shutter,spectrometer,results = self._aQ.get(block=block,timeout=timeout)
             except Empty:
-                return
+                if block:
+                    if not haveResults:
+                        return 'nok: autointegration has not finished within time limit'
+                    if not success:
+                        return 'nok: autointegration failed'
+                return 'ok'
+            haveResults = True
             if results.success:
                 self.setIntegrationTime(shutter,spectrometer,results.bestIntegrationTime)
             else:
+                success=False
                 msg='Autointegration for %s %s failed'%(spectrometer,shutter)
                 self._messages.warning(msg)
                 self.log.warning(msg)
@@ -443,16 +452,25 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes[shutter][spectrometer]
 
-    def record(self,outDir='spectra',delay=0.,nCycles=1):
+    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
         """record spectra
 
         :param outDir: name of output directory
         :param delay: delay in seconds between each record
-        :param nCycles: the number of recording cycles or 'Inf'"""
+        :param nCycles: the number of recording cycles or 'Inf'
+        :param auto: when set to True determine best integration time before recording spectra
+        :param timeout: wait at most timeoutseconds for autointegration to have finished"""
 
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
+        if auto:
+            result = self.setIntegrationTimeAuto()
+            if result != 'ok':
+                return result
+            result = self.checkAutoIntegrationResults(block=True,timeout=timeout)
+            if result != 'ok':
+                return result
         self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
         return 'ok'
 
