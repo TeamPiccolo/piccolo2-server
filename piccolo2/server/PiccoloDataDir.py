@@ -26,6 +26,14 @@ import subprocess
 import os, os.path, glob
 import logging
 
+def cmpMtimes(f1,f2):
+    if os.path.getmtime(f1) < os.path.getmtime(f2):
+        return -1
+    elif os.path.getmtime(f1) > os.path.getmtime(f2):
+        return 1
+    else:
+        return 0
+
 class PiccoloDataDir(object):
     """manage piccolo output data directory"""
     def __init__(self,datadir,device='/dev/sda1',mntpnt='/mnt',mount=False):
@@ -118,13 +126,14 @@ class PiccoloDataDir(object):
             if cmdPipe.wait()!=0:
                 raise OSError, 'unmounting {}: {}'.format(self._device, cmdPipe.stderr.read())
 
-    def getFileList(self,path,pattern='*.pico*'):
+    def getFileList(self,path,pattern='*.pico*',haveNFiles=0):
         p = self.join(path)
+        fullList = glob.glob(os.path.join(p,pattern))
+        fullList.sort(cmpMtimes)
         fileList = []
-        for f in glob.glob(os.path.join(p,pattern)):
+        for f in fullList:
             fileList.append(os.path.relpath(f,self.datadir))
-        fileList.sort()
-        return fileList
+        return fileList[haveNFiles:]
 
     def getNextCounter(self,path,pattern='*.pico*'):
         nextCounter = 0

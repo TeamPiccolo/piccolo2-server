@@ -536,8 +536,8 @@ class Piccolo(PiccoloInstrument):
             info['datadir'] = 'not mounted'
         return info
 
-    def getSpectraList(self,outDir='spectra'):
-        return self._datadir.getFileList(outDir)
+    def getSpectraList(self,outDir='spectra',haveNFiles=0):
+        return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
 
     def getSpectra(self,fname='',chunk=None):
         if chunk == None:
