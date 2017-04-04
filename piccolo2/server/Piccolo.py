@@ -137,7 +137,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 r=self._spectrometers[s].getAutointegrateResult()
                 self._autoResults.put((shutter,s,r))
             self._shutters[shutter].closeShutter()
-    
+
     def record(self,integrationTime,dark=False,upwelling=False):
         if dark:
             darkStr = 'dark'
@@ -195,7 +195,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
-            prefix = os.path.join(outDir,'{0:04d}_'.format(self.getCounter(outDir)))
+            prefix = os.path.join(outDir,'untitled_bat{0:04d}_'.format(self.getCounter(outDir)))
             dark = False # Default is "light"?
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
@@ -318,7 +318,7 @@ class Piccolo(PiccoloInstrument):
         self._status.connected = True
 
         self._messages = PiccoloMessages()
-        
+
         # integration times
         self._integrationTimes = {}
         for shutter in self.getShutterList():
@@ -354,7 +354,7 @@ class Piccolo(PiccoloInstrument):
     def getMessage(self,listener=None):
         """get a message"""
         return self._messages.getMessage(listener)
-            
+
     def getSpectrometerList(self):
         """get list of attached spectrometers"""
         return self._spectrometers
@@ -416,7 +416,7 @@ class Piccolo(PiccoloInstrument):
 
     def checkAutoIntegrationResults(self,block=False,timeout=30.):
         """check autointegration results
-    
+
         :param block: wait until results are available - default do not block
         :param timeout: when block is True wait at most timeout seconds
         """
@@ -487,7 +487,7 @@ class Piccolo(PiccoloInstrument):
 
     def pause(self):
         self._tQ.put('pause')
-        
+
     def status(self,listener=None):
         """return status of shutter
 
@@ -496,7 +496,7 @@ class Piccolo(PiccoloInstrument):
 
 
         self.checkAutoIntegrationResults()
-        
+
         self._status.busy = self._busy.locked()
         self._status.paused = self._paused.locked()
         self._status.file_incremented = self._file_incremented.isSet()
@@ -504,12 +504,12 @@ class Piccolo(PiccoloInstrument):
         if self._status.file_incremented:
             self._messages.warning("avoided overwriting existing file by incrementing file number")
             self._file_incremented.clear()
-        
+
         try:
             self._status.new_message = self._messages.status(listener)
         except:
             self._status.new_message = False
-                
+
         return self._status.encode()
 
     def info(self):
