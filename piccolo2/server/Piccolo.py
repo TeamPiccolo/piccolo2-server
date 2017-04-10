@@ -232,6 +232,8 @@ class PiccoloThread(PiccoloWorkerThread):
                     else:
                         direction = 'downwelling'
                     for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
+                        # Insert the batch and sequence numbers into the metadata.
+                        s.update({'Batch': n})
                         spectra.append(s)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)
