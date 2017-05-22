@@ -134,7 +134,16 @@ def main():
 
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
-        from lockfile.pidlockfile import PIDLockFile
+        try:
+            import lockfile
+        except ImportError:
+            print "The 'lockfile' Python module is required to run Piccolo Server. Ensure that version 0.12 or later of lockfile is installed."
+            sys.exit(1)
+        try:
+            from lockfile.pidlockfile import PIDLockFile
+        except ImportError:
+            print "An outdated version of the 'lockfile' Python module is installed. Piccolo Server requires at least version 0.12 or later of lockfile."
+            sys.exit(1)
         from lockfile import AlreadyLocked, NotLocked
 
         # create a pid file and tidy up if required
