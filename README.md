@@ -1,2 +1,1 @@
-# MOVED #
-This repository was used during the development of *Piccolo 2 Server* by [Dr Magnus Hagdorn](https://bitbucket.org/magnus_hagdorn/). Since 24th May 2016 the code for *Piccolo 2 Server* resides in the *Piccolo* repository in the ```Piccolo/Source/server``` directory. Please use the [Piccolo](https://bitbucket.org/teampiccolo/piccolo) repository to access code and commit changes.
+This repository contains the Python code for Piccolo Server which runs on a Raspberry Pi. It was eveloped by [Dr Magnus Hagdorn](https://bitbucket.org/magnus_hagdorn/). There are several related repositories: piccolo2-common, piccolo2-client and piccolo2-player
