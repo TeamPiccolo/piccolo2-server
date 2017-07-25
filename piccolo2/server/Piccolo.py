@@ -51,6 +51,7 @@ class PiccoloThread(PiccoloWorkerThread):
         self._datadir = datadir
         self._paused = paused
         self._shutters = shutters
+        self._gps = gps
         self._spectrometers = spectrometers
         self._outCounter = {}
         self._autoResults = autoResults
@@ -235,6 +236,8 @@ class PiccoloThread(PiccoloWorkerThread):
                     for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
                         # Insert the batch and sequence numbers into the metadata.
                         s.update({'Batch': n})
+                        # Insert GPS measurement into metadata
+                        s.update({'gps':self._gps.getRecord()})
                         spectra.append(s)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)
