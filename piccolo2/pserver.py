@@ -34,6 +34,9 @@ def piccolo_server(serverCfg):
 
     log = logging.getLogger("piccolo.server")
 
+    # setup the blinking status led
+    piccolo.StatusLED.start()
+
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
                                    device=serverCfg.cfg['datadir']['device'],
@@ -92,10 +95,13 @@ def piccolo_server(serverCfg):
     for sname in spectrometers:
         pd.registerComponent(spectrometers[sname])
 
+    # initialize the gps
+    gps = piccolo.PiccoloGPS()
     # initialise the piccolo component
-    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,
+    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,gps,
                          clobber=piccoloCfg.cfg['output']['clobber'],
-                         split=piccoloCfg.cfg['output']['split'])
+                         split=piccoloCfg.cfg['output']['split'],
+                         cfg = piccoloCfg.cfg )
     pd.registerComponent(pc)
 
     pJSONController = piccolo.PiccoloControllerCherryPy()
@@ -104,8 +110,11 @@ def piccolo_server(serverCfg):
     pXBEEController = None
     try:
         pXBEEController = piccolo.PiccoloControllerXbee()
+        piccolo.StatusLED.show_spectrometers(spectrometers)
     except Exception as e:
         log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
+        piccolo.StatusLED.not_ok()
+
     if pXBEEController!=None:
         pd.registerController(pXBEEController)
 
@@ -172,6 +181,8 @@ def main():
     else:
         # start piccolo
         piccolo_server(serverCfg)
+
+    piccolo.StatusLED.stop()
 
 if __name__ == '__main__':
     main()

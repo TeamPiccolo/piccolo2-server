@@ -28,6 +28,7 @@ from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
 from piccolo2.PiccoloStatus import PiccoloStatus
+import PiccoloSimplify
 import socket
 import psutil
 import subprocess
@@ -36,14 +37,14 @@ import threading
 from Queue import Queue, Empty
 import time
 import logging
-import os.path
-
+import os.path, json
+import numpy
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,datadir,shutters,spectrometers,busy,paused,tasks,results,autoResults,file_incremented):
+    def __init__(self,name,datadir,shutters,spectrometers,gps,busy,paused,tasks,results,autoResults,file_incremented):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
 
@@ -293,7 +294,7 @@ class Piccolo(PiccoloInstrument):
 
     the piccolo server itself is treated as an instrument"""
 
-    def __init__(self,name,datadir,shutters,spectrometers,clobber=True,split=True):
+    def __init__(self,name,datadir,shutters,spectrometers,gps,clobber=True,split=True,cfg={}):
         """
         :param name: name of the component
         :param datadir: data directory
@@ -319,6 +320,10 @@ class Piccolo(PiccoloInstrument):
         self._status = PiccoloStatus()
         self._status.connected = True
 
+        self._gps = gps
+
+        self._cfg = cfg
+
         self._messages = PiccoloMessages()
 
         # integration times
@@ -335,7 +340,7 @@ class Piccolo(PiccoloInstrument):
         self._rQ = Queue()
         self._aQ = Queue()
         self._file_incremented = threading.Event()
-        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers,self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
+        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers, gps, self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
         self._worker.start()
 
         # handling the output thread
@@ -542,12 +547,57 @@ class Piccolo(PiccoloInstrument):
         return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
 
     def getSpectra(self,fname='',chunk=None):
+        data = self._datadir.getFileData(fname)
         if chunk == None:
-            return self._datadir.getFileData(fname)
+            return data
         else:
             if fname != self._spectraCache[0]:
-                self._spectraCache = (fname,PiccoloSpectraList(data=self._datadir.getFileData(fname)))
+                if 'SimplifySpectra' in self._cfg:
+                    self.log.info("SimplifySpectra")
+                    data = self.simplifySpectra(data)
+        
+                self._spectraCache = (fname,PiccoloSpectraList(data=data))
             return self._spectraCache[1].getChunk(chunk)
+
+    def simplifySpectra(self, data):
+        jdata = json.loads(data)
+
+        piccoloData = {
+            "SequenceNumber": jdata['SequenceNumber'],
+            "Spectra": jdata['Spectra']
+        }
+        
+        for s in piccoloData['Spectra']:
+            meta            = s['Metadata']
+            pixels          = s['Pixels']
+            serialNumber    = meta['SerialNumber']
+            dark            = meta['Dark']
+            direction       = meta["Direction"]
+
+            WavelengthCalibrationCoefficients = meta['WavelengthCalibrationCoefficients']
+            wcc = WavelengthCalibrationCoefficients
+
+            s['Pixels'] = numpy.asarray(s['Pixels'],dtype=numpy.float32)
+            isize = s['Pixels'].size
+            wavelengths = numpy.poly1d(wcc[::-1])(numpy.arange(s['Pixels'].size))
+            threshold = 10
+            if "QEP" in serialNumber:
+                self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
+                threshold=2
+
+            simple_px,simple_wv = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
+            simple_px = numpy.round(simple_px,2).tolist()
+
+            s['Metadata']['Wavelengths'] = numpy.round(simple_wv,3).tolist()
+            del s['Metadata']['WavelengthCalibrationCoefficients']
+            s['Pixels'] = numpy.round(simple_px,2).tolist()
+            print(len(s['Pixels']))
+            print(len(s['Metadata']['Wavelengths']))
+            osize = len(s['Pixels'])
+
+            self.log.info("Simplified {0} {1} {2} from {3} pts to {4} pts".format(serialNumber, direction, dark, isize, osize))
+
+        return piccoloData
 
     def getClock(self):
         """get the current date and time
@@ -565,6 +615,10 @@ class Piccolo(PiccoloInstrument):
                 raise OSError, 'setting date to \'{}\': {}'.format(clock,cmdPipe.stderr.read())
             return cmdPipe.stdout.read()
         return ''
+
+    def getLocation(self):
+        """get current GPS location and metadata"""
+        return self._gps.getRecord()
 
     def isMountedDataDir(self):
         """check if datadir is mounted"""

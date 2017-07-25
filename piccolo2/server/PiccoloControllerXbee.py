@@ -38,7 +38,7 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
 
         PiccoloWorkerThread.__init__(self,'xbee',busy,tasks,results)
         if haveRadio:
-            self._rd = radio.XBeeRadio()
+            self._rd = radio.XBeeRadio('/dev/serial0')
             self.log.info('xbee serial number %s'%self._rd.serialNumber)
         else:
             self._rd = None

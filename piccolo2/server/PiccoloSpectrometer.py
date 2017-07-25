@@ -29,13 +29,19 @@ __all__ = ['PiccoloSpectrometer']
 from piccolo2.PiccoloSpectra import *
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloWorkerThread import PiccoloWorkerThread
-from piccolo2.hardware.spectrometers import AutointegrationNoLightError
-from piccolo2.hardware.spectrometers import AutointegrationUnstableLightError
-from piccolo2.hardware.spectrometers import AutointegrationExceededMaximumIntegrationTimeError
 import time
 import threading
 from Queue import Queue
 import logging
+try:
+    from piccolo2.hardware.spectrometers import AutointegrationNoLightError
+    from piccolo2.hardware.spectrometers import AutointegrationUnstableLightError
+    from piccolo2.hardware.spectrometers import AutointegrationExceededMaximumIntegrationTimeError
+except ImportError:
+    logging.warn("Using outdated spectrometer drivers.")
+    AutointegrationNoLightError = Exception
+    AutointegrationUnstableLightError = Exception
+    AutointegrationExceededMaximumIntegrationTimeError = Exception
 import sys
 
 class Task(object):

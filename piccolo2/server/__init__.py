@@ -23,7 +23,8 @@ from PiccoloDispatcher import *
 from PiccoloController import *
 from PiccoloControllerCherryPy import *
 from PiccoloControllerXbee import *
-
+from PiccoloStatusLED import *
+from PiccoloGPS import *
 # the instruments
 from Piccolo import *
 from PiccoloShutter import *
