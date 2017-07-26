@@ -233,11 +233,12 @@ class PiccoloThread(PiccoloWorkerThread):
                         direction = 'upwelling'
                     else:
                         direction = 'downwelling'
+                    gps0 = self._gps.getRecord()
                     for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
                         # Insert the batch and sequence numbers into the metadata.
                         s.update({'Batch': n})
                         # Insert GPS measurement into metadata
-                        s.update({'gps':self._gps.getRecord()})
+                        s.update({'gps start':gps0,'gps end':self._gps.getRecord()})
                         spectra.append(s)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)
@@ -549,13 +550,13 @@ class Piccolo(PiccoloInstrument):
     def getSpectraList(self,outDir='spectra',haveNFiles=0):
         return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
 
-    def getSpectra(self,fname='',chunk=None):
+    def getSpectra(self,fname='',chunk=None,simplify=False):
         data = self._datadir.getFileData(fname)
         if chunk == None:
             return data
         else:
             if fname != self._spectraCache[0]:
-                if 'SimplifySpectra' in self._cfg:
+                if simplify: 
                     self.log.info("SimplifySpectra")
                     data = self.simplifySpectra(data)
         
