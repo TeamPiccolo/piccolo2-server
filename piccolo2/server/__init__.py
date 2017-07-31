@@ -25,6 +25,7 @@ from PiccoloControllerCherryPy import *
 from PiccoloControllerXbee import *
 from PiccoloStatusLED import *
 from PiccoloGPS import *
+from PiccoloLaserAltimeter import *
 # the instruments
 from Piccolo import *
 from PiccoloShutter import *

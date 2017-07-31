@@ -95,10 +95,19 @@ def piccolo_server(serverCfg):
     for sname in spectrometers:
         pd.registerComponent(spectrometers[sname])
 
-    # initialize the gps
-    gps = piccolo.PiccoloGPS()
+    # initialize auxiliary data collection instruments
+    aux = {}
+    #TODO: Better way tot check for all possible aux instruments
+    possible_aux = {
+            'GPS':piccolo.PiccoloGPS,
+            'Altimeter':piccolo.PiccoloAltimeter
+    }
+    if 'AuxiliaryInstruments' in piccoloCfg.cfg:
+        for inst in piccoloCfg.cfg['AuxiliaryInstruments']:
+            aux[inst] = possible_aux[inst](inst)
+
     # initialise the piccolo component
-    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,gps,
+    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,aux,
                          clobber=piccoloCfg.cfg['output']['clobber'],
                          split=piccoloCfg.cfg['output']['split'],
                          cfg = piccoloCfg.cfg )

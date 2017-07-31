@@ -68,6 +68,13 @@ class PiccoloInstrument(object):
         self.log.debug("stopped")
         return 'ok'
 
+class PiccoloAuxInstrument(PiccoloInstrument):
+    """class used to define non-essential metadata gathering 
+    instruments attached to the piccolo system 
+    """
+    def getRecord(self):
+        return None
+
 if __name__ == '__main__':
     from piccoloLogging import *
 

@@ -1,4 +1,4 @@
-from PiccoloInstrument import PiccoloInstrument
+from PiccoloInstrument import PiccoloAuxInstrument
 import threading
 
 try:
@@ -40,8 +40,9 @@ class GpsPoller(threading.Thread):
 
 
 
-class PiccoloGPS(object):
-    def __init__(self,host="localhost",port="2947"):
+class PiccoloGPS(PiccoloAuxInstrument):
+    def __init__(self,name,host="localhost",port="2947"):
+        PiccoloAuxInstrument.__init__(self,name)
         self.connected = HAS_GPS
         if HAS_GPS:
             self._gpsp = GpsPoller(host,port)
@@ -61,7 +62,7 @@ class PiccoloGPS(object):
 
 if __name__ == '__main__':
     import time
-    pgps = PiccoloGPS()
+    pgps = PiccoloGPS('GPS')
     try:
         while 1:
             time.sleep(1)

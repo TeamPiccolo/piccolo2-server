@@ -44,14 +44,14 @@ class PiccoloThread(PiccoloWorkerThread):
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,datadir,shutters,spectrometers,gps,busy,paused,tasks,results,autoResults,file_incremented):
+    def __init__(self,name,datadir,shutters,spectrometers,aux,busy,paused,tasks,results,autoResults,file_incremented):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
 
         self._datadir = datadir
         self._paused = paused
         self._shutters = shutters
-        self._gps = gps
+        self._aux = aux
         self._spectrometers = spectrometers
         self._outCounter = {}
         self._autoResults = autoResults
@@ -169,6 +169,16 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters[direction].closeShutter()
         return spectra
 
+    def makeAuxMeasurements(self,instruments=None):
+        """Collect one recording from each auxilary instrument
+        """
+        measurements = {}
+        for key in self._aux:
+            if instruments is None or key in instruments:
+                measurements[key] = self._aux[key].getRecord()
+
+        return measurements
+
     def run(self):
         while True:
             # wait for a new task from the task queue
@@ -233,12 +243,14 @@ class PiccoloThread(PiccoloWorkerThread):
                         direction = 'upwelling'
                     else:
                         direction = 'downwelling'
-                    gps0 = self._gps.getRecord()
+                    aux0 = self.makeAuxMeasurements()
+
                     for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
                         # Insert the batch and sequence numbers into the metadata.
                         s.update({'Batch': n})
                         # Insert GPS measurement into metadata
-                        s.update({'gps start':gps0,'gps end':self._gps.getRecord()})
+                        s.update({k+' start':v for k,v in aux0.items()})
+                        s.update({k+' end':v for k,v in self.makeAuxMeasurements().items()})
                         spectra.append(s)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)
@@ -298,7 +310,7 @@ class Piccolo(PiccoloInstrument):
 
     the piccolo server itself is treated as an instrument"""
 
-    def __init__(self,name,datadir,shutters,spectrometers,gps,clobber=True,split=True,cfg={}):
+    def __init__(self,name,datadir,shutters,spectrometers,auxiliaries,clobber=True,split=True,cfg={}):
         """
         :param name: name of the component
         :param datadir: data directory
@@ -324,7 +336,7 @@ class Piccolo(PiccoloInstrument):
         self._status = PiccoloStatus()
         self._status.connected = True
 
-        self._gps = gps
+        self._aux = auxiliaries
 
         self._cfg = cfg
 
@@ -344,7 +356,7 @@ class Piccolo(PiccoloInstrument):
         self._rQ = Queue()
         self._aQ = Queue()
         self._file_incremented = threading.Event()
-        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers, gps, self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
+        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers,auxiliaries,self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
         self._worker.start()
 
         # handling the output thread
@@ -622,7 +634,16 @@ class Piccolo(PiccoloInstrument):
 
     def getLocation(self):
         """get current GPS location and metadata"""
-        return self._gps.getRecord()
+        if "GPS" in self._aux:
+            return self._aux['GPS'].getRecord()
+        else:
+            return {p:'No GPS'for p in('lat','lon','alt','speed','time')}
+
+    def getAltitude(self):
+        if "Altimeter" in self._aux:
+            return self._aux['Altimeter'].getRecord()
+        else:
+            return "No Altimeter"
 
     def isMountedDataDir(self):
         """check if datadir is mounted"""
