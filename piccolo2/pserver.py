@@ -104,7 +104,21 @@ def piccolo_server(serverCfg):
     }
     if 'AuxiliaryInstruments' in piccoloCfg.cfg:
         for inst in piccoloCfg.cfg['AuxiliaryInstruments']:
-            aux[inst] = possible_aux[inst](inst)
+            if inst in possible_aux:
+                #read the kwarg dict for the selected instrument from config
+                handler_kwargs = piccoloCfg.cfg['AuxiliaryInstruments'][inst]
+                #get the name of the class of the handler thread
+                handler_id = handler_kwargs['handler']
+                del handler_kwargs['handler']
+                #instantiate an instance of the selected class with the given kwargs
+                handlerClass = getattr(piccolo,handler_id)
+                handler = handlerClass(**handler_kwargs)
+                #add the appropriate PiccoloInstrument to aux 
+                aux[inst]=possible_aux[inst](inst,handler)
+            else:
+                log.warn("Skipping unsupported peripheral instrument {}".format(inst))
+
+    print(aux)
 
     # initialise the piccolo component
     pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,aux,
@@ -117,12 +131,18 @@ def piccolo_server(serverCfg):
     pd.registerController(pJSONController)
 
     pXBEEController = None
-    try:
-        pXBEEController = piccolo.PiccoloControllerXbee()
-        piccolo.StatusLED.show_spectrometers(spectrometers)
-    except Exception as e:
-        log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
-        piccolo.StatusLED.not_ok()
+
+    while pXBEEController is None:
+        try:
+            pXBEEController = piccolo.PiccoloControllerXbee()
+            piccolo.StatusLED.show_spectrometers(spectrometers)
+        except Exception as e:
+            log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
+            piccolo.StatusLED.not_ok()
+        if not serverCfg.cfg['radio']['force_radio']:
+            #if force_radio is set, keep trying to initialize the controller
+            #otherwise, break and fall back on the cherrypy controller
+            break
 
     if pXBEEController!=None:
         pd.registerController(pXBEEController)

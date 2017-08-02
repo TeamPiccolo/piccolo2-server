@@ -53,6 +53,7 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters = shutters
         self._aux = aux
         self._spectrometers = spectrometers
+        self._spectrometer_enabled= {s:True for s in spectrometers}
         self._outCounter = {}
         self._autoResults = autoResults
         self._file_incremented = file_incremented
@@ -106,11 +107,15 @@ class PiccoloThread(PiccoloWorkerThread):
                 return
             return cmd
         else:
-            assert len(cmd)==4
-            if self.busy.locked():
-                self.log.warn('already recording data')
-                return
-            return cmd
+            assert isinstance(cmd,tuple)
+            if len(cmd) == 4:
+                if self.busy.locked():
+                    self.log.warn('already recording data')
+                    return
+                return cmd
+            elif cmd[0] == 'enabled':
+                self.log.info("Setting enabled status of {} to {}".format(*cmd[1:]))
+                return cmd
 
     def getCounter(self,key):
         if key not in self._outCounter:
@@ -141,6 +146,11 @@ class PiccoloThread(PiccoloWorkerThread):
             self._shutters[shutter].closeShutter()
 
     def record(self,integrationTime,dark=False,upwelling=False):
+        #only use enabled spectra
+        integrationTime = {k:v for k,v in integrationTime.items()
+                               if self._spectrometer_enabled[k]}
+        if len(integrationTime.keys()) == 0:
+            self.log.warn("Trying to record with no enabled spectrometers")
         if dark:
             darkStr = 'dark'
         else:
@@ -170,7 +180,7 @@ class PiccoloThread(PiccoloWorkerThread):
         return spectra
 
     def makeAuxMeasurements(self,instruments=None):
-        """Collect one recording from each auxilary instrument
+        """Collect one recording from each auxiliary instrument
         """
         measurements = {}
         for key in self._aux:
@@ -194,9 +204,13 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.busy.release()
                 self.log.info("finished autointegration")
                 continue
+            elif task[0] == 'enabled':
+                self._spectrometer_enabled[task[1]] = task[2]
+                continue
             elif len(task) == 4:
                 # get task
                 (integrationTime,outDir,nCycles,delay) = task
+
             else:
                 # nothing interesting, get the next command
                 continue
@@ -558,6 +572,12 @@ class Piccolo(PiccoloInstrument):
         else:
             info['datadir'] = 'not mounted'
         return info
+    
+    def setSpectrometerEnabledStatus(self,spectrometer=None,enabled=False):
+        """Enable or disable a spectrometer for recording
+        """
+        #just pass the info along to our PiccoloThread
+        self._tQ.put(("enabled",spectrometer,enabled))
 
     def getSpectraList(self,outDir='spectra',haveNFiles=0):
         return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
@@ -607,8 +627,6 @@ class Piccolo(PiccoloInstrument):
             s['Metadata']['Wavelengths'] = numpy.round(simple_wv,3).tolist()
             del s['Metadata']['WavelengthCalibrationCoefficients']
             s['Pixels'] = numpy.round(simple_px,2).tolist()
-            print(len(s['Pixels']))
-            print(len(s['Metadata']['Wavelengths']))
             osize = len(s['Pixels'])
 
             self.log.info("Simplified {0} {1} {2} from {3} pts to {4} pts".format(serialNumber, direction, dark, isize, osize))
@@ -633,11 +651,12 @@ class Piccolo(PiccoloInstrument):
         return ''
 
     def getLocation(self):
-        """get current GPS location and metadata"""
+        """Deprecated - get current GPS location and metadata"""
         if "GPS" in self._aux:
             return self._aux['GPS'].getRecord()
         else:
             return {p:'No GPS'for p in('lat','lon','alt','speed','time')}
+
 
     def getAltitude(self):
         if "Altimeter" in self._aux:
@@ -645,6 +664,7 @@ class Piccolo(PiccoloInstrument):
         else:
             return "No Altimeter"
 
+    
     def isMountedDataDir(self):
         """check if datadir is mounted"""
         return self._datadir.isMounted

@@ -49,6 +49,10 @@ daemon = boolean(default=False)
 # name of PID file
 pid_file = string(default=/var/run/piccolo.pid)
 
+[radio]
+#try to connect to radio forever if true, don't fall back on http
+force_radio = boolean(default=False)
+
 [datadir]
 # control location of output files
 # if datadir is a relative path (ie it does not start with a /) write to PWD or
@@ -96,6 +100,7 @@ class PiccoloServerConfig(object):
         datagroup = parser.add_argument_group('datadir')
         datagroup.add_argument('-o','--data-dir',help="name of data directory, default {}".format(self._cfg['datadir']['datadir']))
         datagroup.add_argument('-m','--mount',default=None,action='store_true',help="mount a device for writing data")
+        datagroup.add_argument('-f','--force-radio',default=None,action='store_true',help="Retry radio connection indefinitely")
 
         args = parser.parse_args()
 
@@ -119,6 +124,8 @@ class PiccoloServerConfig(object):
             self._cfg['datadir']['datadir'] = args.data_dir
         if args.mount != None:
             self._cfg['datadir']['mount'] = args.mount
+        if args.force_radio != None:
+            self._cfg['radio']['force_radio'] = args.force_radio
 
     @property
     def cfg(self):
