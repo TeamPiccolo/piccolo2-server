@@ -650,21 +650,19 @@ class Piccolo(PiccoloInstrument):
             return cmdPipe.stdout.read()
         return ''
 
-    def getLocation(self):
-        """Deprecated - get current GPS location and metadata"""
-        if "GPS" in self._aux:
-            return self._aux['GPS'].getRecord()
+    def getAuxRecord(self,aux_inst=None):
+        """Get a record from an attached peripheral instrument 
+        (GPS, Altimeter, etc)
+        """
+        if aux_inst in self._aux:
+            return self._aux[aux_inst].getRecord()
         else:
-            return {p:'No GPS'for p in('lat','lon','alt','speed','time')}
+            self.log.warn("Recieved request for unkown measurement {}".format(aux_inst))
+            return None
 
+    def getAttachedAuxInstruments(self):
+        return self._aux.keys()
 
-    def getAltitude(self):
-        if "Altimeter" in self._aux:
-            return self._aux['Altimeter'].getRecord()
-        else:
-            return "No Altimeter"
-
-    
     def isMountedDataDir(self):
         """check if datadir is mounted"""
         return self._datadir.isMounted

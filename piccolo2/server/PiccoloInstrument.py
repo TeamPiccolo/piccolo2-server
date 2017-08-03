@@ -23,6 +23,7 @@
 __all__ = ['PiccoloInstrument']
 
 import logging
+import threading
 
 class PiccoloInstrument(object):
     """base class used to define instruments attached to the piccolo system
@@ -68,12 +69,51 @@ class PiccoloInstrument(object):
         self.log.debug("stopped")
         return 'ok'
 
-class PiccoloAuxInstrument(PiccoloInstrument):
-    """class used to define non-essential metadata gathering 
-    instruments attached to the piccolo system 
+
+
+class PiccoloAuxHandlerThread(threading.Thread):
+    """Thread to poll/query an attached peripheral instrument
+    Interfaces with rest of program through PiccoloAuxInstrument
     """
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._isConnected = self._testConnection()
+
+    def _testConnection(self):
+        """Test whether the hardware is connected"""
+        return True
+
+    @property
+    def connected(self):
+        return self._isConnected
+
+    def run(self):
+        raise NotImplementedError
+
+    def requestInstrumentMeasurement(self):
+        raise NotImplementedError
+
+    def retrieveInstrumentResponse(self):
+        raise NotImplementedError
+
     def getRecord(self):
-        return None
+        self.requestInstrumentMeasurement()
+        return self.retrieveInstrumentResponse()
+
+class PiccoloAuxInstrument(PiccoloInstrument):
+    """class used to define non-essential metadata gathering instruments 
+    attached to the piccolo system. Relays information between an
+    instrument's driver thread and the rest of the system
+    """
+    def __init__(self,name,handlerThread=None):
+        PiccoloInstrument.__init__(self,name)
+        self._handlerThread = handlerThread
+        if handlerThread:
+            handlerThread.start()
+
+    def getRecord(self):
+        return self._handlerThread.getRecord()
 
 if __name__ == '__main__':
     from piccoloLogging import *

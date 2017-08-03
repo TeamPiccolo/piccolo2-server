@@ -97,26 +97,32 @@ def piccolo_server(serverCfg):
 
     # initialize auxiliary data collection instruments
     aux = {}
-    #TODO: Better way tot check for all possible aux instruments
-    possible_aux = {
-            'GPS':piccolo.PiccoloGPS,
-            'Altimeter':piccolo.PiccoloAltimeter
-    }
     if 'AuxiliaryInstruments' in piccoloCfg.cfg:
         for inst in piccoloCfg.cfg['AuxiliaryInstruments']:
-            if inst in possible_aux:
-                #read the kwarg dict for the selected instrument from config
-                handler_kwargs = piccoloCfg.cfg['AuxiliaryInstruments'][inst]
-                #get the name of the class of the handler thread
+            #read the kwarg dict for the selected instrument from config
+            handler_kwargs = piccoloCfg.cfg['AuxiliaryInstruments'][inst]
+            #get the name of the class of the handler thread
+            try:
                 handler_id = handler_kwargs['handler']
-                del handler_kwargs['handler']
-                #instantiate an instance of the selected class with the given kwargs
+            except KeyError:
+                log.error("Must specify handler for peripheral instrument {}".format(inst))
+                log.info("Add line 'handler=\"HandlerClass\"' under [[{}]] in piccolo.config".format(inst))
+                continue
+
+            del handler_kwargs['handler']
+            #instantiate an instance of the selected class with the given kwargs
+            try:
                 handlerClass = getattr(piccolo,handler_id)
-                handler = handlerClass(**handler_kwargs)
-                #add the appropriate PiccoloInstrument to aux 
-                aux[inst]=possible_aux[inst](inst,handler)
-            else:
+                #make sure we're getting an actual handler class
+                assert issubclass(handlerClass,piccolo.PiccoloAuxHandlerThread)
+            except AttributeError,AssertionError:
+                #an unknown auxiliary instrument was passed in
                 log.warn("Skipping unsupported peripheral instrument {}".format(inst))
+                continue
+
+            handler = handlerClass(**handler_kwargs)
+            #add the appropriate PiccoloInstrument to aux 
+            aux[inst]=piccolo.PiccoloAuxInstrument(inst,handler)
 
     print(aux)
 
