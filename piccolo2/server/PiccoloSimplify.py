@@ -2,7 +2,6 @@
 # It uses a combination of Douglas-Peucker and Radial Distance algorithms
 
 import numpy as np
-
 class DouglasPeuckerSimplifier(object):
 
     def __init__(self,xs,ys,tolerance):
@@ -94,7 +93,7 @@ class DouglasPeuckerSimplifier(object):
                 last = last_stack[last_i]
                 last_i -=1 
 
-        return self.xs[self.markers],self.ys[self.markers]
+        return self.xs[self.markers],self.ys[self.markers],np.where(self.markers)[0]
 
 
 def simplify(xs,ys, tolerance=0.1, highestQuality=True):

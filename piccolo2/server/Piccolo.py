@@ -28,6 +28,7 @@ from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
 from piccolo2.PiccoloStatus import PiccoloStatus
+from piccolo2.PiccoloCompress import compressArray,compressAsDiff
 import PiccoloSimplify
 import socket
 import psutil
@@ -37,7 +38,8 @@ import threading
 from Queue import Queue, Empty
 import time
 import logging
-import os.path, json
+import os.path
+import json
 import numpy
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
@@ -600,6 +602,7 @@ class Piccolo(PiccoloInstrument):
 
         piccoloData = {
             "SequenceNumber": jdata['SequenceNumber'],
+            "Simplified":True,
             "Spectra": jdata['Spectra']
         }
         
@@ -621,13 +624,32 @@ class Piccolo(PiccoloInstrument):
                 self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
                 threshold=2
 
-            simple_px,simple_wv = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
-            simple_px = numpy.round(simple_px,2).tolist()
+            simple_px,simple_wv,simple_idx = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
+            osize = simple_px.size
+            
+            #convert simplified arrays to compressed base64 encoded bytestrings
+            b64_px = compressArray(simple_px)
+            is_diff,b64_idx = compressAsDiff(simple_idx)            
 
-            s['Metadata']['Wavelengths'] = numpy.round(simple_wv,3).tolist()
-            del s['Metadata']['WavelengthCalibrationCoefficients']
-            s['Pixels'] = numpy.round(simple_px,2).tolist()
-            osize = len(s['Pixels'])
+            print(is_diff)
+            print(b64_px,b64_idx)
+
+
+
+
+            #remove nonessential metadata
+            used_meta_keys = ('SerialNumber','Dark','Direction',
+                    'WavelengthCalibrationCoefficients','SaturationLevel')
+            s['Metadata'] = {k:v for k,v in meta.items() if k in used_meta_keys}
+
+
+            # Add compressed spectrum as metadata - it doesn't play nice with 
+            # PiccoloDispatcher otherwise
+            # TODO figure out why
+            s['Metadata']['WavelengthsB64'] = b64_idx
+            s['Metadata']['DiffCompressed'] = is_diff
+            s['Metadata']['PixelsB64'] = b64_px
+            s['Pixels'] = []
 
             self.log.info("Simplified {0} {1} {2} from {3} pts to {4} pts".format(serialNumber, direction, dark, isize, osize))
 
