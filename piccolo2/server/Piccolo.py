@@ -28,7 +28,7 @@ from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
 from piccolo2.PiccoloStatus import PiccoloStatus
-from piccolo2.PiccoloCompress import compressArray,compressAsDiff
+import piccolo2.PiccoloCompress as pcompress
 import PiccoloSimplify
 import socket
 import psutil
@@ -584,15 +584,18 @@ class Piccolo(PiccoloInstrument):
     def getSpectraList(self,outDir='spectra',haveNFiles=0):
         return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
 
+    def getMostRecentSpectrum(self,outDir='spectra'):
+        return self._datadir.getFileList(outDir,haveNFiles=-1)[0]
+
     def getSpectra(self,fname='',chunk=None,simplify=False):
         data = self._datadir.getFileData(fname)
-        if chunk == None:
+        if simplify: 
+            self.log.info("SimplifySpectra")
+            return self.simplifySpectra(data)
+        elif chunk == None:
             return data
         else:
             if fname != self._spectraCache[0]:
-                if simplify: 
-                    self.log.info("SimplifySpectra")
-                    data = self.simplifySpectra(data)
         
                 self._spectraCache = (fname,PiccoloSpectraList(data=data))
             return self._spectraCache[1].getChunk(chunk)
@@ -605,7 +608,10 @@ class Piccolo(PiccoloInstrument):
             "Simplified":True,
             "Spectra": jdata['Spectra']
         }
-        
+        meta = pcompress.compressMetadata(jdata['Spectra'])
+        #use single-character keys, this may be overkill
+        outData = { "M":meta, "P":[], "W":[], "D":'' }
+        serialNumbers = [s['Metadata']['SerialNumber']for s in jdata['Spectra']]
         for s in piccoloData['Spectra']:
             meta            = s['Metadata']
             pixels          = s['Pixels']
@@ -619,41 +625,45 @@ class Piccolo(PiccoloInstrument):
             s['Pixels'] = numpy.asarray(s['Pixels'],dtype=numpy.float32)
             isize = s['Pixels'].size
             wavelengths = numpy.poly1d(wcc[::-1])(numpy.arange(s['Pixels'].size))
-            threshold = 10
+            threshold = 5 
             if "QEP" in serialNumber:
+                #QEP spectra have a small wavenumber range, so a smaller
+                #simplification threshold is required
                 self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
-                threshold=2
+                threshold=1
+                #also check for invalid data flag and cut off points after it
+                maxed_pix = numpy.argmax(s['Pixels'] > 100000)
+                if maxed_pix:
+                    s['Pixels'] = s['Pixels'][:maxed_pix]
+                    wavelengths = wavelengths[:maxed_pix]
+
+            if "USB" in serialNumber:
+                #USB spectra tend to have a big spike right at the beginning, 
+                #which doesn't play nice with simplification
+                max_idx = numpy.argmax(s['Pixels'][:5])
+                s['Pixels'][max_idx] = numpy.mean(s['Pixels'][[max_idx-1,max_idx+1]])
 
             simple_px,simple_wv,simple_idx = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
             osize = simple_px.size
             
             #convert simplified arrays to compressed base64 encoded bytestrings
-            b64_px = compressArray(simple_px)
-            is_diff,b64_idx = compressAsDiff(simple_idx)            
-
-            print(is_diff)
-            print(b64_px,b64_idx)
-
-
-
+            b64_px = pcompress.compress16to8(simple_px.astype('uint16'))
+            is_diff,b64_idx = pcompress.compressAsDiff(simple_idx)            
 
             #remove nonessential metadata
             used_meta_keys = ('SerialNumber','Dark','Direction',
                     'WavelengthCalibrationCoefficients','SaturationLevel')
-            s['Metadata'] = {k:v for k,v in meta.items() if k in used_meta_keys}
 
-
-            # Add compressed spectrum as metadata - it doesn't play nice with 
-            # PiccoloDispatcher otherwise
-            # TODO figure out why
-            s['Metadata']['WavelengthsB64'] = b64_idx
-            s['Metadata']['DiffCompressed'] = is_diff
-            s['Metadata']['PixelsB64'] = b64_px
-            s['Pixels'] = []
+            #s['Metadata']['WavelengthsB64'] = b64_idx
+            #s['Metadata']['DiffCompressed'] = is_diff
+            #s['Metadata']['PixelsB64'] = b64_px
+            outData['W'].append(b64_idx)
+            outData['P'].append(b64_px)
+            outData['D'] += str(is_diff)[0]
 
             self.log.info("Simplified {0} {1} {2} from {3} pts to {4} pts".format(serialNumber, direction, dark, isize, osize))
 
-        return piccoloData
+        return outData
 
     def getClock(self):
         """get the current date and time
