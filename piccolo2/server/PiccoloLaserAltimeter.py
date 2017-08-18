@@ -9,7 +9,7 @@ class LightWareSF11Altimeter(PiccoloAuxHandlerThread):
     Polling mode: altimeter sends readings constantly
     On demand mode: send 'd' to altimeter to retrieve reading
     """
-    def __init__(self,port=None,baudrate=None,timeout=2,mode='polling'):
+    def __init__(self,port=None,baudrate=None,timeout=.2,mode='polling'):
         try:
             self._ser = serial.Serial(port,baudrate,timeout=timeout)
         except:
@@ -21,9 +21,11 @@ class LightWareSF11Altimeter(PiccoloAuxHandlerThread):
    
 
     def _readAltitudeFromSerial(self):
-            record = self._ser.readline()
             try:
+                record = self._ser.readline()
                 self._latestAltitude = record.strip().split()[0]
+                #make sure the latestAltitude is castable to float
+                _ = float(self._latestAltitude)
             except Exception:
                 self._latestAltitude = 'N/A'
 
@@ -33,16 +35,23 @@ class LightWareSF11Altimeter(PiccoloAuxHandlerThread):
                 #in polling mode, buffer must be constantly flushed
                 self._readAltitudeFromSerial()
 
+            else:
+                time.sleep(.1)
         
     def _testConnection(self):
         #if the serial port failed to initialize, we're not connected
-        if self._ser is None:
-            return False
+        isConnected = False
+        if self._ser is not None:
+            for i in range(3):
+                self._ser.write(b'd')
+                self._readAltitudeFromSerial()
+                if self._latestAltitude != 'N/A':
+                    isConnected = True
+                    break
+        if not isConnected:
+            logging.warn("No SF11 Laser Altimeter is Connected")
+        return isConnected
 
-        #make sure the serial port is sending data
-        if self.mode == 'ondemand':
-            self._ser.write(b'd')
-        return self._ser.readline() != b''
 
     def requestInstrumentMeasurement(self):
         if self.connected and self.mode == 'ondemand':
@@ -55,9 +64,10 @@ class LightWareSF11Altimeter(PiccoloAuxHandlerThread):
         else:
             return "No connection to LightWareSF11Altimeter found" 
 
-
+#"/dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DQ00A0BA-if00-port0"
+#"usb-FTDI_FT230X_Basic_UART_DQ00A2QI-if00-port0"
 if __name__ == '__main__':    
-    pa = PiccoloAuxInstrument("alt",LightWareSF11Altimeter('/dev/ttyUSB0',115200))
+    pa = PiccoloAuxInstrument("alt",LightWareSF11Altimeter("/dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DQ00A2QI-if00-port0",115200))
     while True:
         print(pa.getRecord())
         time.sleep(.1)

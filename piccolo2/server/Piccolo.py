@@ -317,6 +317,7 @@ class PiccoloOutput(threading.Thread):
             self.log.info('writing {} to {}'.format(spectra.outName,self._datadir.datadir))
             try:
                 spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
+                self._datadir.updateLatestFile(fname=spectra.outName+'.light')
             except RuntimeError, e:
                 self.log.error('writing {} to {}: {}'.format(spectra.outName,self._datadir.datadir,e))
 
@@ -341,6 +342,7 @@ class Piccolo(PiccoloInstrument):
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
         self._datadir = datadir
+        self._datadir.updateLatestFile(path='spectra',pattern="*.pico.light")
 
         self._spectraCache = (None,None)
 
@@ -491,6 +493,15 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes[shutter][spectrometer]
 
+    def getTotalIntegrationTime(self):
+        """Sum of all integration times for a single record"""
+        sum_time = 0
+        for sh in self._integrationTimes:
+            for sp in self._integrationTimes[sh]:
+                sum_time += self._integrationTimes[sh][sp]
+
+        return str(sum_time)
+
     def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
         """record spectra
 
@@ -581,17 +592,26 @@ class Piccolo(PiccoloInstrument):
         #just pass the info along to our PiccoloThread
         self._tQ.put(("enabled",spectrometer,enabled))
 
-    def getSpectraList(self,outDir='spectra',haveNFiles=0):
-        return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
+    def getSpectraList(self,outDir='spectra',haveNFiles=0,compressed = False):
+        files = self._datadir.getFileList(outDir,haveNFiles=haveNFiles) 
+        return pcompress.compressFileList(files) if compressed else files
 
-    def getMostRecentSpectrum(self,outDir='spectra'):
-        return self._datadir.getFileList(outDir,haveNFiles=-1)[0]
 
-    def getSpectra(self,fname='',chunk=None,simplify=False):
+    def getSpectra(self,fname='',chunk=None,simplify=False,outDir=''):
+        #send the most recent spectrum if a specific one isn't requested
+        using_latest = False
+        if fname=='':
+            using_latest = True
+            fname = self._datadir.latestFile
+            print(fname)
+
         data = self._datadir.getFileData(fname)
         if simplify: 
             self.log.info("SimplifySpectra")
-            return self.simplifySpectra(data)
+            out_data = self.simplifySpectra(data)
+            if using_latest:
+                out_data.update({"F":fname})
+            return out_data   
         elif chunk == None:
             return data
         else:
@@ -625,29 +645,39 @@ class Piccolo(PiccoloInstrument):
             s['Pixels'] = numpy.asarray(s['Pixels'],dtype=numpy.float32)
             isize = s['Pixels'].size
             wavelengths = numpy.poly1d(wcc[::-1])(numpy.arange(s['Pixels'].size))
-            threshold = 5 
-            if "QEP" in serialNumber:
-                #QEP spectra have a small wavenumber range, so a smaller
-                #simplification threshold is required
-                self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
-                threshold=1
-                #also check for invalid data flag and cut off points after it
-                maxed_pix = numpy.argmax(s['Pixels'] > 100000)
-                if maxed_pix:
-                    s['Pixels'] = s['Pixels'][:maxed_pix]
-                    wavelengths = wavelengths[:maxed_pix]
 
             if "USB" in serialNumber:
                 #USB spectra tend to have a big spike right at the beginning, 
                 #which doesn't play nice with simplification
                 max_idx = numpy.argmax(s['Pixels'][:5])
                 s['Pixels'][max_idx] = numpy.mean(s['Pixels'][[max_idx-1,max_idx+1]])
+            
+            threshold = 3
+            if "QEP" in serialNumber:
+                #QEP spectra have a small wavenumber range, so a smaller
+                #simplification threshold is required
+                self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
+                threshold=.8
+                #also check for invalid data flag and cut off points after it
+                maxed_pix = numpy.argmax(s['Pixels'] > 100000)
+                if maxed_pix:
+                    s['Pixels'] = s['Pixels'][:maxed_pix]
+                    wavelengths = wavelengths[:maxed_pix]
 
             simple_px,simple_wv,simple_idx = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
+            #simple_px = PiccoloSimplify.savitzky_golay(s['Pixels'],25,5)
+            #simple_idx = range(s['Pixels'].size)
+
+            #smoothing in simplification sometimes results in > 100% pixels
+            if 'SaturationLevel' in s['Metadata']:
+                max_px = s['Metadata']['SaturationLevel']
+                simple_px[simple_px > max_px] = max_px
             osize = simple_px.size
             
             #convert simplified arrays to compressed base64 encoded bytestrings
+            #pcompress.compress16to8diff(simple_px)
             b64_px = pcompress.compress16to8(simple_px.astype('uint16'))
+            #b64_px = pcompress.compressArray(simple_px.astype('uint16'))
             is_diff,b64_idx = pcompress.compressAsDiff(simple_idx)            
 
             #remove nonessential metadata

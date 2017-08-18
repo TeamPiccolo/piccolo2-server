@@ -2,7 +2,7 @@
 # It uses a combination of Douglas-Peucker and Radial Distance algorithms
 
 import numpy as np
-import numpy as np
+import dpsimplify
 from math import factorial
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
@@ -170,7 +170,10 @@ class DouglasPeuckerSimplifier(object):
 
 
 def simplify(xs,ys, tolerance=0.1, highestQuality=True):
-    sqtolerance = tolerance * tolerance
+    #sqtolerance = tolerance * tolerance
     #smooth it out first
     xs = savitzky_golay(xs,25,5)
-    return DouglasPeuckerSimplifier(xs,ys,sqtolerance).simplifyDouglasPeucker()
+    #return DouglasPeuckerSimplifier(xs,ys,sqtolerance).simplifyDouglasPeucker()
+    markers = dpsimplify.simplify(xs,ys,tolerance).astype('bool')
+    
+    return xs[markers],ys[markers],np.where(markers)[0]

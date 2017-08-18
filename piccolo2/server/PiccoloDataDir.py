@@ -51,6 +51,8 @@ class PiccoloDataDir(object):
 
         self._mount = mount
         self._device = device
+        self._latestFile = None
+
         if mntpnt.endswith(os.sep):
             self._mntpnt = mntpnt[:-1]
         else:
@@ -134,6 +136,19 @@ class PiccoloDataDir(object):
         for f in fullList:
             fileList.append(os.path.relpath(f,self.datadir))
         return fileList[haveNFiles:]
+
+    @property
+    def latestFile(self):
+        return self._latestFile
+    
+    def updateLatestFile(self,fname=None,path='',pattern='*.pico'):
+        if fname is not None and os.path.exists(self.join(fname)):
+            self._latestFile = fname
+        elif fname is not None:
+            self.log.warn("New latest file {} does not exist".format(fname))
+        else:
+            self._latestFile =  self.getFileList(path,pattern,-1)[0]
+        
 
     def getNextCounter(self,path,pattern='*.pico*'):
         nextCounter = 0
