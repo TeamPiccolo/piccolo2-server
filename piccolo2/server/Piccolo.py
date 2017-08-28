@@ -28,6 +28,7 @@ from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
 from piccolo2.PiccoloStatus import PiccoloStatus
+import piccolo2.PiccoloCompress as pcompress
 import PiccoloSimplify
 import socket
 import psutil
@@ -37,7 +38,8 @@ import threading
 from Queue import Queue, Empty
 import time
 import logging
-import os.path, json
+import os.path
+import json
 import numpy
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
@@ -53,6 +55,7 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters = shutters
         self._aux = aux
         self._spectrometers = spectrometers
+        self._spectrometer_enabled= {s:True for s in spectrometers}
         self._outCounter = {}
         self._autoResults = autoResults
         self._file_incremented = file_incremented
@@ -106,11 +109,15 @@ class PiccoloThread(PiccoloWorkerThread):
                 return
             return cmd
         else:
-            assert len(cmd)==4
-            if self.busy.locked():
-                self.log.warn('already recording data')
-                return
-            return cmd
+            assert isinstance(cmd,tuple)
+            if len(cmd) == 4:
+                if self.busy.locked():
+                    self.log.warn('already recording data')
+                    return
+                return cmd
+            elif cmd[0] == 'enabled':
+                self.log.info("Setting enabled status of {} to {}".format(*cmd[1:]))
+                return cmd
 
     def getCounter(self,key):
         if key not in self._outCounter:
@@ -141,6 +148,11 @@ class PiccoloThread(PiccoloWorkerThread):
             self._shutters[shutter].closeShutter()
 
     def record(self,integrationTime,dark=False,upwelling=False):
+        #only use enabled spectra
+        integrationTime = {k:v for k,v in integrationTime.items()
+                               if self._spectrometer_enabled[k]}
+        if len(integrationTime.keys()) == 0:
+            self.log.warn("Trying to record with no enabled spectrometers")
         if dark:
             darkStr = 'dark'
         else:
@@ -170,7 +182,7 @@ class PiccoloThread(PiccoloWorkerThread):
         return spectra
 
     def makeAuxMeasurements(self,instruments=None):
-        """Collect one recording from each auxilary instrument
+        """Collect one recording from each auxiliary instrument
         """
         measurements = {}
         for key in self._aux:
@@ -194,9 +206,13 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.busy.release()
                 self.log.info("finished autointegration")
                 continue
+            elif task[0] == 'enabled':
+                self._spectrometer_enabled[task[1]] = task[2]
+                continue
             elif len(task) == 4:
                 # get task
                 (integrationTime,outDir,nCycles,delay) = task
+
             else:
                 # nothing interesting, get the next command
                 continue
@@ -301,6 +317,7 @@ class PiccoloOutput(threading.Thread):
             self.log.info('writing {} to {}'.format(spectra.outName,self._datadir.datadir))
             try:
                 spectra.write(prefix=self._datadir.datadir,clobber=self._clobber,split=self._split)
+                self._datadir.updateLatestFile(fname=spectra.outName+'.light')
             except RuntimeError, e:
                 self.log.error('writing {} to {}: {}'.format(spectra.outName,self._datadir.datadir,e))
 
@@ -325,6 +342,7 @@ class Piccolo(PiccoloInstrument):
         assert isinstance(datadir,PiccoloDataDir)
         PiccoloInstrument.__init__(self,name)
         self._datadir = datadir
+        self._datadir.updateLatestFile(path='spectra',pattern="*.pico.light")
 
         self._spectraCache = (None,None)
 
@@ -475,6 +493,15 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes[shutter][spectrometer]
 
+    def getTotalIntegrationTime(self):
+        """Sum of all integration times for a single record"""
+        sum_time = 0
+        for sh in self._integrationTimes:
+            for sp in self._integrationTimes[sh]:
+                sum_time += self._integrationTimes[sh][sp]
+
+        return str(sum_time)
+
     def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
         """record spectra
 
@@ -558,19 +585,37 @@ class Piccolo(PiccoloInstrument):
         else:
             info['datadir'] = 'not mounted'
         return info
+    
+    def setSpectrometerEnabledStatus(self,spectrometer=None,enabled=False):
+        """Enable or disable a spectrometer for recording
+        """
+        #just pass the info along to our PiccoloThread
+        self._tQ.put(("enabled",spectrometer,enabled))
 
-    def getSpectraList(self,outDir='spectra',haveNFiles=0):
-        return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)
+    def getSpectraList(self,outDir='spectra',haveNFiles=0,compressed = False):
+        files = self._datadir.getFileList(outDir,haveNFiles=haveNFiles) 
+        return pcompress.compressFileList(files) if compressed else files
 
-    def getSpectra(self,fname='',chunk=None,simplify=False):
+
+    def getSpectra(self,fname='',chunk=None,simplify=False,outDir=''):
+        #send the most recent spectrum if a specific one isn't requested
+        using_latest = False
+        if fname=='':
+            using_latest = True
+            fname = self._datadir.latestFile
+            print(fname)
+
         data = self._datadir.getFileData(fname)
-        if chunk == None:
+        if simplify: 
+            self.log.info("SimplifySpectra")
+            out_data = self.simplifySpectra(data)
+            if using_latest:
+                out_data.update({"F":fname})
+            return out_data   
+        elif chunk == None:
             return data
         else:
             if fname != self._spectraCache[0]:
-                if simplify: 
-                    self.log.info("SimplifySpectra")
-                    data = self.simplifySpectra(data)
         
                 self._spectraCache = (fname,PiccoloSpectraList(data=data))
             return self._spectraCache[1].getChunk(chunk)
@@ -580,9 +625,13 @@ class Piccolo(PiccoloInstrument):
 
         piccoloData = {
             "SequenceNumber": jdata['SequenceNumber'],
+            "Simplified":True,
             "Spectra": jdata['Spectra']
         }
-        
+        meta = pcompress.compressMetadata(jdata['Spectra'])
+        #use single-character keys, this may be overkill
+        outData = { "M":meta, "P":[], "W":[], "D":'' }
+        serialNumbers = [s['Metadata']['SerialNumber']for s in jdata['Spectra']]
         for s in piccoloData['Spectra']:
             meta            = s['Metadata']
             pixels          = s['Pixels']
@@ -596,24 +645,55 @@ class Piccolo(PiccoloInstrument):
             s['Pixels'] = numpy.asarray(s['Pixels'],dtype=numpy.float32)
             isize = s['Pixels'].size
             wavelengths = numpy.poly1d(wcc[::-1])(numpy.arange(s['Pixels'].size))
-            threshold = 10
+
+            if "USB" in serialNumber:
+                #USB spectra tend to have a big spike right at the beginning, 
+                #which doesn't play nice with simplification
+                max_idx = numpy.argmax(s['Pixels'][:5])
+                s['Pixels'][max_idx] = numpy.mean(s['Pixels'][[max_idx-1,max_idx+1]])
+            
+            threshold = 3
             if "QEP" in serialNumber:
+                #QEP spectra have a small wavenumber range, so a smaller
+                #simplification threshold is required
                 self.log.info("Using lower simplification threshold for {0}".format(serialNumber))
-                threshold=2
+                threshold=.8
+                #also check for invalid data flag and cut off points after it
+                maxed_pix = numpy.argmax(s['Pixels'] > 100000)
+                if maxed_pix:
+                    s['Pixels'] = s['Pixels'][:maxed_pix]
+                    wavelengths = wavelengths[:maxed_pix]
 
-            simple_px,simple_wv = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
-            simple_px = numpy.round(simple_px,2).tolist()
+            simple_px,simple_wv,simple_idx = PiccoloSimplify.simplify(s['Pixels'],wavelengths,threshold)
+            #simple_px = PiccoloSimplify.savitzky_golay(s['Pixels'],25,5)
+            #simple_idx = range(s['Pixels'].size)
 
-            s['Metadata']['Wavelengths'] = numpy.round(simple_wv,3).tolist()
-            del s['Metadata']['WavelengthCalibrationCoefficients']
-            s['Pixels'] = numpy.round(simple_px,2).tolist()
-            print(len(s['Pixels']))
-            print(len(s['Metadata']['Wavelengths']))
-            osize = len(s['Pixels'])
+            #smoothing in simplification sometimes results in > 100% pixels
+            if 'SaturationLevel' in s['Metadata']:
+                max_px = s['Metadata']['SaturationLevel']
+                simple_px[simple_px > max_px] = max_px
+            osize = simple_px.size
+            
+            #convert simplified arrays to compressed base64 encoded bytestrings
+            #pcompress.compress16to8diff(simple_px)
+            b64_px = pcompress.compress16to8(simple_px.astype('uint16'))
+            #b64_px = pcompress.compressArray(simple_px.astype('uint16'))
+            is_diff,b64_idx = pcompress.compressAsDiff(simple_idx)            
+
+            #remove nonessential metadata
+            used_meta_keys = ('SerialNumber','Dark','Direction',
+                    'WavelengthCalibrationCoefficients','SaturationLevel')
+
+            #s['Metadata']['WavelengthsB64'] = b64_idx
+            #s['Metadata']['DiffCompressed'] = is_diff
+            #s['Metadata']['PixelsB64'] = b64_px
+            outData['W'].append(b64_idx)
+            outData['P'].append(b64_px)
+            outData['D'] += str(is_diff)[0]
 
             self.log.info("Simplified {0} {1} {2} from {3} pts to {4} pts".format(serialNumber, direction, dark, isize, osize))
 
-        return piccoloData
+        return outData
 
     def getClock(self):
         """get the current date and time
@@ -632,18 +712,18 @@ class Piccolo(PiccoloInstrument):
             return cmdPipe.stdout.read()
         return ''
 
-    def getLocation(self):
-        """get current GPS location and metadata"""
-        if "GPS" in self._aux:
-            return self._aux['GPS'].getRecord()
+    def getAuxRecord(self,aux_inst=None):
+        """Get a record from an attached peripheral instrument 
+        (GPS, Altimeter, etc)
+        """
+        if aux_inst in self._aux:
+            return self._aux[aux_inst].getRecord()
         else:
-            return {p:'No GPS'for p in('lat','lon','alt','speed','time')}
+            self.log.warn("Recieved request for unkown measurement {}".format(aux_inst))
+            return None
 
-    def getAltitude(self):
-        if "Altimeter" in self._aux:
-            return self._aux['Altimeter'].getRecord()
-        else:
-            return "No Altimeter"
+    def getAttachedAuxInstruments(self):
+        return self._aux.keys()
 
     def isMountedDataDir(self):
         """check if datadir is mounted"""

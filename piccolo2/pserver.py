@@ -97,14 +97,34 @@ def piccolo_server(serverCfg):
 
     # initialize auxiliary data collection instruments
     aux = {}
-    #TODO: Better way tot check for all possible aux instruments
-    possible_aux = {
-            'GPS':piccolo.PiccoloGPS,
-            'Altimeter':piccolo.PiccoloAltimeter
-    }
     if 'AuxiliaryInstruments' in piccoloCfg.cfg:
         for inst in piccoloCfg.cfg['AuxiliaryInstruments']:
-            aux[inst] = possible_aux[inst](inst)
+            #read the kwarg dict for the selected instrument from config
+            handler_kwargs = piccoloCfg.cfg['AuxiliaryInstruments'][inst]
+            #get the name of the class of the handler thread
+            try:
+                handler_id = handler_kwargs['handler']
+            except KeyError:
+                log.error("Must specify handler for peripheral instrument {}".format(inst))
+                log.info("Add line 'handler=\"HandlerClass\"' under [[{}]] in piccolo.config".format(inst))
+                continue
+
+            del handler_kwargs['handler']
+            #instantiate an instance of the selected class with the given kwargs
+            try:
+                handlerClass = getattr(piccolo,handler_id)
+                #make sure we're getting an actual handler class
+                assert issubclass(handlerClass,piccolo.PiccoloAuxHandlerThread)
+            except AttributeError,AssertionError:
+                #an unknown auxiliary instrument was passed in
+                log.warn("Skipping unsupported peripheral instrument {}".format(inst))
+                continue
+
+            handler = handlerClass(**handler_kwargs)
+            #add the appropriate PiccoloInstrument to aux 
+            aux[inst]=piccolo.PiccoloAuxInstrument(inst,handler)
+
+    print(aux)
 
     # initialise the piccolo component
     pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,aux,
@@ -117,12 +137,18 @@ def piccolo_server(serverCfg):
     pd.registerController(pJSONController)
 
     pXBEEController = None
-    try:
-        pXBEEController = piccolo.PiccoloControllerXbee()
-        piccolo.StatusLED.show_spectrometers(spectrometers)
-    except Exception as e:
-        log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
-        piccolo.StatusLED.not_ok()
+
+    while pXBEEController is None:
+        try:
+            pXBEEController = piccolo.PiccoloControllerXbee()
+            piccolo.StatusLED.show_spectrometers(spectrometers)
+        except Exception as e:
+            log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
+            piccolo.StatusLED.not_ok()
+        if not serverCfg.cfg['radio']['force_radio']:
+            #if force_radio is set, keep trying to initialize the controller
+            #otherwise, break and fall back on the cherrypy controller
+            break
 
     if pXBEEController!=None:
         pd.registerController(pXBEEController)

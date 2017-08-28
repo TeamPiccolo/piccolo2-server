@@ -1,21 +1,17 @@
-from PiccoloInstrument import PiccoloAuxInstrument
-import threading
+from PiccoloInstrument import PiccoloAuxInstrument, PiccoloAuxHandlerThread
 
-try:
-    import gps
-    HAS_GPS = True
-except:
-    HAS_GPS = False
 
-class GpsPoller(threading.Thread):
-    def __init__(self,host,port):
-        threading.Thread.__init__(self)
-        self.daemon=True
+class AdafruitGPS(PiccoloAuxHandlerThread):
+    def __init__(self,host='localhost',port='2947'):
+        #adafruit GPS module, sudo apt-get install python-gps
+        import gps
         self.gpsd = gps.gps(host,port)
         self.gpsd.stream(gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
         
-        self.current_value = None
+        self.current_value = {}
         self.running = True #setting the thread running to true
+
+        PiccoloAuxHandlerThread.__init__(self)
  
     def run(self):
         report = {}
@@ -31,38 +27,13 @@ class GpsPoller(threading.Thread):
 
             elif report.get('class',None) == 'TPV':
                 self.current_value = report
-                #print "gps time:", report['time']
-            #else:
-            #   if self.running:
-            #      time.sleep(0.01)
-
-	print "GpsPoller finished"
-
-
-
-class PiccoloGPS(PiccoloAuxInstrument):
-    def __init__(self,name,host="localhost",port="2947"):
-        PiccoloAuxInstrument.__init__(self,name)
-        self.connected = HAS_GPS
-        if HAS_GPS:
-            self._gpsp = GpsPoller(host,port)
-            self._gpsp.start()
 
     def getRecord(self,keys=('lat', 'lon', 'time', 'speed', 'alt',)):
-        record = (HAS_GPS and self._gpsp.current_value) or {}
-        return  {k:record.get(k,'N/A') for k in keys}
-
-    def stop(self):
-        self._gpsp.running = False
-        self._gpsp.join()
-
-    def __del__(self):
-        pass
-        #self.stop()
+        return {k:self.current_value.get(k,'N/A') for k in keys}
 
 if __name__ == '__main__':
     import time
-    pgps = PiccoloGPS('GPS')
+    pgps = PiccoloAuxInstrument('GPS',AdafruitGPS())
     try:
         while 1:
             time.sleep(1)
