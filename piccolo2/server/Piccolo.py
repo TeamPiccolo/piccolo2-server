@@ -196,7 +196,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
-            prefix = os.path.join(outDir,'untitled_bat{0:04d}_'.format(self.getCounter(outDir)))
+            prefix = os.path.join(outDir,'b{0:06d}_'.format(self.getCounter(outDir)))
             dark = False # Default is "light"?
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
@@ -555,7 +555,7 @@ class Piccolo(PiccoloInstrument):
                 if 'SimplifySpectra' in self._cfg:
                     self.log.info("SimplifySpectra")
                     data = self.simplifySpectra(data)
-        
+
                 self._spectraCache = (fname,PiccoloSpectraList(data=data))
             return self._spectraCache[1].getChunk(chunk)
 
@@ -566,7 +566,7 @@ class Piccolo(PiccoloInstrument):
             "SequenceNumber": jdata['SequenceNumber'],
             "Spectra": jdata['Spectra']
         }
-        
+
         for s in piccoloData['Spectra']:
             meta            = s['Metadata']
             pixels          = s['Pixels']
