@@ -196,7 +196,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
-            prefix = os.path.join(outDir,'b{0:06d}_'.format(self.getCounter(outDir)))
+            prefix = os.path.join(outDir,'b{0:06d}_s'.format(self.getCounter(outDir)))
             dark = False # Default is "light"?
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
@@ -234,7 +234,7 @@ class PiccoloThread(PiccoloWorkerThread):
                         direction = 'downwelling'
                     for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
                         # Insert the batch and sequence numbers into the metadata.
-                        s.update({'Batch': n})
+                        s.update({'Batch': self.getCounter(outDir)})
                         spectra.append(s)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)

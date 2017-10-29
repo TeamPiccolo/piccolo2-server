@@ -409,7 +409,10 @@ class SpectrometerThread(PiccoloWorkerThread):
 
         # create new spectrum instance
         spectrum = PiccoloSpectrum()
-        spectrum.setDark(task.dark)
+        if task.dark:
+            spectrum.setDark()
+        else:
+            spectrum.setLight()
         if task.direction == 'upwelling':
             spectrum.setUpwelling(True)
         elif task.direction == 'downwelling':
