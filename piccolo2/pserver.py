@@ -34,6 +34,8 @@ def piccolo_server(serverCfg):
 
     log = logging.getLogger("piccolo.server")
 
+    log.info("piccolo2 server version %s"%piccolo.__version__)
+    
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
                                    device=serverCfg.cfg['datadir']['device'],

@@ -25,6 +25,7 @@ __all__ = ['PiccoloServerConfig']
 from configobj import ConfigObj
 from validate import Validator
 from argparse import ArgumentParser
+import sys
 
 # the defaults
 defaultCfgStr = """
@@ -88,6 +89,7 @@ class PiccoloServerConfig(object):
         parser.add_argument('-l', '--log-file',metavar="FILE",help="send piccolo log to FILE, default stdout")
 
         parser.add_argument('-u','--piccolo-url',metavar='URL',help="set the URL of the piccolo JSON-RPC server, default {}".format(self._cfg['jsonrpc']['url']))
+        parser.add_argument('-v','--version',action='store_true',default=False,help="print version and exit")
 
         daemongroup = parser.add_argument_group('daemon')
         daemongroup.add_argument('-D','--daemonize',default=None,action='store_true',help="start piccolo server as daemon")
@@ -99,6 +101,11 @@ class PiccoloServerConfig(object):
 
         args = parser.parse_args()
 
+        if args.version:
+            from piccolo2.server import __version__
+            print __version__
+            sys.exit(0)
+        
         if args.server_configuration!=None:
             self._cfg.filename = args.server_configuration
             self._cfg.reload()

@@ -1,3 +1,7 @@
+2017-11-06 Magnus Hagdorn 
+ * piccolo2/pserver.py: report server version
+ * piccolo2/server/PiccoloServerConfig.py: add option to print version
+
 2017-11-06 Magnus Hagdorn
  * piccolo2/server/__init__.py: set __version__
  * setup.py: get version from hg tag
