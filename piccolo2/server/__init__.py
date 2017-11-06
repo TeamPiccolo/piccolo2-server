@@ -15,6 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with piccolo2-server.  If not, see <http://www.gnu.org/licenses/>.
 
+from pkg_resources import get_distribution, DistributionNotFound
+try:
+    __version__ = get_distribution('piccolo2-server').version
+except DistributionNotFound:
+    # package is not installed
+    pass
+
 from piccoloLogging import *
 from PiccoloServerConfig import *
 from PiccoloConfig import *
