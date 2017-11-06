@@ -59,7 +59,7 @@ datadir = string(default=pdata)
 mount = boolean(default=False)
 # device to be mounted
 # Iain Robinson temporarily changed the default device from sda1 to sdb1 for testing.
-device = string(default=/dev/sdb1)
+device = string(default=/dev/sda1)
 # the mount point
 mntpnt = string(default=/mnt)
 

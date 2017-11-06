@@ -36,6 +36,9 @@ def piccolo_server(serverCfg):
 
     log.info("piccolo2 server version %s"%piccolo.__version__)
     
+    # setup the blinking status led
+    piccolo.StatusLED.start()
+
     # create data directory
     pData = piccolo.PiccoloDataDir(serverCfg.cfg['datadir']['datadir'],
                                    device=serverCfg.cfg['datadir']['device'],
@@ -94,10 +97,13 @@ def piccolo_server(serverCfg):
     for sname in spectrometers:
         pd.registerComponent(spectrometers[sname])
 
+    # initialize the gps
+    gps = piccolo.PiccoloGPS()
     # initialise the piccolo component
-    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,
+    pc = piccolo.Piccolo('piccolo',pData,shutters,spectrometers,gps,
                          clobber=piccoloCfg.cfg['output']['clobber'],
-                         split=piccoloCfg.cfg['output']['split'])
+                         split=piccoloCfg.cfg['output']['split'],
+                         cfg = piccoloCfg.cfg )
     pd.registerComponent(pc)
 
     pJSONController = piccolo.PiccoloControllerCherryPy()
@@ -106,8 +112,11 @@ def piccolo_server(serverCfg):
     pXBEEController = None
     try:
         pXBEEController = piccolo.PiccoloControllerXbee()
+        piccolo.StatusLED.show_spectrometers(spectrometers)
     except Exception as e:
         log.warn('Cannot initialise the XBee radio controller because an exception occurred. {}'.format(e))
+        piccolo.StatusLED.not_ok()
+
     if pXBEEController!=None:
         pd.registerController(pXBEEController)
 
@@ -136,7 +145,16 @@ def main():
 
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
-        from lockfile.pidlockfile import PIDLockFile
+        try:
+            import lockfile
+        except ImportError:
+            print "The 'lockfile' Python module is required to run Piccolo Server. Ensure that version 0.12 or later of lockfile is installed."
+            sys.exit(1)
+        try:
+            from lockfile.pidlockfile import PIDLockFile
+        except ImportError:
+            print "An outdated version of the 'lockfile' Python module is installed. Piccolo Server requires at least version 0.12 or later of lockfile."
+            sys.exit(1)
         from lockfile import AlreadyLocked, NotLocked
 
         # create a pid file and tidy up if required
@@ -165,6 +183,8 @@ def main():
     else:
         # start piccolo
         piccolo_server(serverCfg)
+
+    piccolo.StatusLED.stop()
 
 if __name__ == '__main__':
     main()

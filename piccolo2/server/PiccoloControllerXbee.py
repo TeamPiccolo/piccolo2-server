@@ -38,12 +38,12 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
 
         PiccoloWorkerThread.__init__(self,'xbee',busy,tasks,results)
         if haveRadio:
-            self._rd = radio.XBeeRadio()
-            self.log.info('xbee serial number %s'%self._rd.getSerialNumber())
+            self._rd = radio.XBeeRadio('/dev/serial0')
+            self.log.info('xbee serial number %s'%self._rd.serialNumber)
         else:
             self._rd = None
             self.log.warning('radio module not availalbe')
-        
+
     def run(self):
         if self._rd == None:
             return
@@ -66,7 +66,7 @@ class PiccoloXbeeThread(PiccoloWorkerThread):
             self._rd.writeBlock(res,snr)
 
             self.log.debug('done')
-            
+
 
 class PiccoloControllerXbee(PiccoloController):
     def __init__(self,panid='2525'):
@@ -75,7 +75,7 @@ class PiccoloControllerXbee(PiccoloController):
 
         self._worker = PiccoloXbeeThread(busy,self.taskQ,self.doneQ)
         self._worker.start()
-    
+
 
 if __name__ == '__main__':
     xbee = PiccoloControllerXbee()

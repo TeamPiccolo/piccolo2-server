@@ -29,17 +29,7 @@ from validate import Validator
 
 # the defaults
 defaultCfgStr = """
-# There are two channels for light: Upwelling and Downwelling. This section
-# associates a shutter (1, 2 or 3) and a fibre with each channel. This
-# information is required to ensure that the correct shutter (1, 2 or 3) is
-# openend to record each spectrum. This section also includes information about
-# the optical fibre used for each channel. This information is not used by the
-# Piccolo, but it is saved in the meatadata (header) section of data (Pico)
-# files.
-#
-# If the polarity of a shutter connection has been reversed the shutter will
-# be open when it should be closed; and closed when it should be open. If this
-# happens, try changing Reverse from false to true.
+# This is the Piccolo instrument configuration file.
 
 [channels]
   [[__many__]]
@@ -47,24 +37,15 @@ defaultCfgStr = """
     reverse = boolean(default=False) # Is the polarity of the shutter connection reversed?
     fibreDiameter = integer(default=600) # micrometres
 
-# Some spectrometers have adjustable configuration options. For example, the
-# Ocean Optics NIRQuest 512 spectrometer has a detector which is cooled (or
-# heated) by a thermoelectric cooler. The temperature to which the detector will
-# be cooled can be adjusted. A cooler temperature will reduce the electronic
-# noise in the signal and increase the power consumption. The spectrometer's fan
-# can also be turned on or off. These settings will be applied when the
-# Piccolo's hardware is initialized. The settings will be applied only to the
-# spectrometer with the given serial number.
 [spectrometers]
   [[__many__]]
-    detectorTemperature = float(default=None)
-    fan = boolean(default=None)
+    detectorSetTemperature = float(default=-10.0)
+    fan = boolean(default=True)
 
-# configure output options
 [output]
   # overwrite output files when clobber is set to True
   clobber = boolean(default=False)
-  # write separate files containing only dark and light spectra when split is 
+  # write separate files containing only dark and light spectra when split is
   # set to True
   split = boolean(default=True)
 """

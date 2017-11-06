@@ -3,6 +3,8 @@ syntax: glob
 
 *.pyc
 *.pico
+*.light
+*.dark
 *~
 
 docs/_build
