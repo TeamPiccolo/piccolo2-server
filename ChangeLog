@@ -1,3 +1,6 @@
+2017-11-20 Magnus Hagdorn
+ * piccolo2/server/PiccoloStatusLED.py: avoid loading GPIO module
+
 2017-11-06 Magnus Hagdorn 
  * piccolo2/pserver.py: report server version
  * piccolo2/server/PiccoloServerConfig.py: add option to print version
