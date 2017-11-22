@@ -41,6 +41,8 @@ defaultCfgStr = """
   [[__many__]]
     detectorSetTemperature = float(default=-10.0)
     fan = boolean(default=True)
+    min_integration_time = float(default=1000.) # minimum integration time in ms
+    max_integration_time = float(default=65535000.) # maximum integration time in ms
 
 [output]
   # overwrite output files when clobber is set to True

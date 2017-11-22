@@ -331,7 +331,12 @@ class Piccolo(PiccoloInstrument):
         for shutter in self.getShutterList():
             self._integrationTimes[shutter] = {}
             for spectrometer in self.getSpectrometerList():
-                self._integrationTimes[shutter][spectrometer] = 1000
+                self._integrationTimes[shutter][spectrometer] = spectrometers[spectrometer].getCurrentIntegrationTime()
+        self._minIntegrationTimes = {}
+        self._maxIntegrationTimes = {}
+        for spectrometer in self.getSpectrometerList():
+            self._minIntegrationTimes[spectrometer] = spectrometers[spectrometer].getMinIntegrationTime()
+            self._maxIntegrationTimes[spectrometer] = spectrometers[spectrometer].getMaxIntegrationTime()
 
         # handling the worker thread
         self._busy = threading.Lock()
@@ -396,6 +401,22 @@ class Piccolo(PiccoloInstrument):
         self._integrationTimes[shutter][spectrometer] = milliseconds
         return 'ok'
 
+    def setMinIntegrationTime(self,spectrometer=None,milliseconds=1000.):
+        """set the minimum integration time"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        self._messages.addMessage('ITmin|%s'%(spectrometer))
+        self._minIntegrationTimes[spectrometer] = milliseconds
+        return 'ok'
+    
+    def setMaxIntegrationTime(self,spectrometer=None,milliseconds=1000.):
+        """set the maximum integration time"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        self._messages.addMessage('ITmax|%s'%(spectrometer))
+        self._maxIntegrationTimes[spectrometer] = milliseconds
+        return 'ok'
+    
     def setIntegrationTimeManual(self, shutter=None, spectrometer=None, milliseconds=1000.):
         """Set the integration time manually.
 
@@ -459,6 +480,22 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes[shutter][spectrometer]
 
+    def getMinIntegrationTime(self,spectrometer=None):
+        """get the minimum integration time
+
+        :param spectrometer: the spectrometer name"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._minIntegrationTimes[spectrometer]
+    
+    def getMaxIntegrationTime(self,spectrometer=None):
+        """get the maximum integration time
+
+        :param spectrometer: the spectrometer name"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._maxIntegrationTimes[spectrometer]
+    
     def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
         """record spectra
 

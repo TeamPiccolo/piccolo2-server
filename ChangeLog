@@ -1,3 +1,11 @@
+2017-11-22 Magnus Hagdorn
+ * piccolo2/pserver.py: get integration time config from config file
+ * piccolo2/server/Piccolo.py: handle min/max integration time settings
+ * piccolo2/server/PiccoloConfig.py: add option to set min/max integration
+   time
+ * piccolo2/server/PiccoloSpectrometer.py: handle min/max integration time
+   settings
+
 2017-11-20 Magnus Hagdorn
  * piccolo2/server/PiccoloStatusLED.py: avoid loading GPIO module
 

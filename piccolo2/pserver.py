@@ -95,6 +95,9 @@ def piccolo_server(serverCfg):
                 s = None
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
     for sname in spectrometers:
+        if sname[2:] in piccoloCfg.cfg['spectrometers']:
+            spectrometers[sname].minIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['min_integration_time']
+            spectrometers[sname].maxIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['max_integration_time']
         pd.registerComponent(spectrometers[sname])
 
     # initialize the gps

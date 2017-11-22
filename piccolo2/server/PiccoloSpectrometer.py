@@ -170,6 +170,7 @@ class AutointegrateTask(Task):
     """
 
     def __init__(self):
+        self._tmin = None # Minimum permitted integration time in milliseconds.
         self._tmax = None # Maximum permitted integration time in milliseconds.
         self._target = 0.7 # Best peak counts as a percentage of saturation.
 
@@ -229,6 +230,38 @@ class AutointegrateTask(Task):
         except ValueError:
             raise Exception('The autointegration peak value must be a percentage. {} is type {}.'.format(p, type(p)))
         self.target = p_float / float(100)
+
+    @property
+    def minimumIntegrationTime(self):
+        """Get the minimum integration time that autointegration can return.
+
+        :returns:  float -- integration time in milliseconds.
+        """
+        return self._tmin
+        
+    @minimumIntegrationTime.setter
+    def minimumIntegrationTime(self, t):
+        """Set the minimum integration time that autointegration will go to.
+
+        Autointegration determines the best integration time for the spectrum.
+        This function sets the minimum integration time that it may return. It
+        can be used to avoid having autointegration set very long integration
+        times on the spectrometer.
+
+        The default value is None. If set to None, it will default to the
+        minimum integration time supported by the spectrometer. This will vary
+        from model to model, but is typically about 1 min.
+
+        :param t: minimum integration time in milliseconds.
+        :type t: float or int
+        """
+        try:
+            tFloat = float(t) # t could be an integer or a float.
+        except ValueError as e:
+            raise ValueError('The integration time must be a number. {} is {}.'.format(t, type(t)))
+        if tFloat < 0:
+            raise ValueError("The integration time cannot be negative.")
+        self._tmin = tFloat
 
     @property
     def maximumIntegrationTime(self):
@@ -348,6 +381,25 @@ class SpectrometerThread(PiccoloWorkerThread):
         PiccoloWorkerThread.__init__(self, name, busy, tasks, results)
         self._spec = spectrometer
 
+    @property
+    def currentIntegrationTime(self):
+        return self._spec.currentIntegrationTime
+    @currentIntegrationTime.setter
+    def currentIntegrationTime(self,milliseconds):
+        self._spec.currentIntegrationTime = milliseconds
+    @property
+    def minIntegrationTime(self):
+        return self._spec.minIntegrationTime
+    @minIntegrationTime.setter
+    def minIntegrationTime(self,milliseconds):
+        self._spec.minIntegrationTime = milliseconds
+    @property
+    def maxIntegrationTime(self):
+        return self._spec.maxIntegrationTime
+    @maxIntegrationTime.setter
+    def maxIntegrationTime(self,milliseconds):
+        self._spec.maxIntegrationTime = milliseconds
+  
     def run(self):
         while True:
             # wait for a new task from the task queue
@@ -374,6 +426,8 @@ class SpectrometerThread(PiccoloWorkerThread):
             self._performAcquireTask(task)
         elif type(task) is AutointegrateTask:
             self._performAutointegrateTask(task)
+        elif type(task) is IntegrationTimeTask:
+            self._performIntegrationTimeTask(task)
 
         # The task has completed, so unlock the spectrometer. The result of the
         # task should now be on the results queue waiting to be picked up.
@@ -476,6 +530,19 @@ class PiccoloSpectrometer(PiccoloInstrument):
         # send poison pill to worker
         self._tQ.put(None)
 
+    def getCurrentIntegrationTime(self):
+        return self._spectrometer.currentIntegrationTime
+    def setCurrentIntegrationTime(self,milliseconds):
+        self._spectrometer.currentIntegrationTime = milliseconds
+    def getMinIntegrationTime(self):
+        return self._spectrometer.minIntegrationTime
+    def setMinIntegrationTime(self,milliseconds):
+        self._spectrometer.minIntegrationTime = milliseconds
+    def getMaxIntegrationTime(self):
+        return self._spectrometer.maxIntegrationTime
+    def setMaxIntegrationTime(self,milliseconds):
+        self._spectrometer.maxIntegrationTime = milliseconds
+        
     def status(self):
         """return status of shutter
 
@@ -499,7 +566,11 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         return {'serial' : self._serial,
                 'nSpectra' : self.numSpectra(),
-                'status' : self.status()}
+                'status' : self.status(),
+                'currentIntegrationTime' : self.getCurrentIntegrationTime(),
+                'minIntegrationTime' : self.getMinIntegrationTime(),
+                'maxIntegrationTime' : self.getMaxIntegrationTime(),
+                }
 
     def acquire(self, milliseconds=100, dark=False, upwelling=False):
         """Start acquiring ("recording") a spectrum.
@@ -586,8 +657,8 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         # Create an autointegrate task.
         task = AutointegrateTask()
-        # Could set some parameters for the autointegration here, such as the
-        # "target" or the maximum integration time. For now, just use the defaults.
+        task.minimumIntegrationTime = self.getMinIntegrationTime()
+        task.maximumIntegrationTime = self.getMaxIntegrationTime()
 
         # Put the autointegrate task onto the task queue.
         self._tQ.put(task)
@@ -610,7 +681,7 @@ if __name__ == '__main__':
     # This code is used to test the PiccoloSpectrometer module in Piccolo Server
     # It is not used during normal operation.
     from piccoloLogging import *
-    from matplotlib import pyplot as plt
+    #from matplotlib import pyplot as plt
 
     have_hardware = False # True if the hardware drivers are available
     try:
@@ -633,13 +704,19 @@ if __name__ == '__main__':
         nSpectrometers = 2
         print "No spectrometers connected. {} spectrometers will be simulated.".format(nSpectrometers)
         for i in range(nSpectrometers):
+            sname = 'spectrometer{}'.format(i)
+            if have_hardware:
+                s = piccolo_spectrometers.SimulatedOceanOpticsSpectrometer(sname)
+            else:
+                s = none
             # Create a spectrometer, but don't pass a spectrometer object.
-            spectrometers.append(PiccoloSpectrometer('spectrometer{}'.format(i)))
+            spectrometers.append(PiccoloSpectrometer(sname,spectrometer=s))
 
     for s in spectrometers:
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
-
+        print info
+        
     best = {}
     print 'Determining best integration times...'
     # This will fail if tested with "simulated" spectroemters.
