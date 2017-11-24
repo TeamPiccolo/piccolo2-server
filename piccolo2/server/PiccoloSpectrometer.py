@@ -303,6 +303,11 @@ class AutointegrateTask(Task):
             max_string = " and {} ms maximum integration time".format(t_max)
         return "target {}% of saturation".format(self.targetPercent) + max_string
 
+class MinMaxIntegrationTimeTask(Task):
+    def __init__(self,minTime=None,maxTime=None):
+        self.minIntegrationTime = minTime
+        self.maxIntegrationTime = maxTime
+    
 class Result(object):
     pass
 
@@ -361,7 +366,7 @@ class SpectrometerThread(PiccoloWorkerThread):
 
     LOGNAME = 'spectrometer'
 
-    def __init__(self, name, spectrometer, busy, tasks, results):
+    def __init__(self, name, spectrometer, busy, tasks, results,integration_times):
         """Initialize the worker thread.
 
         Note: calling __init__ does not start the thread, a subsequent call to
@@ -377,28 +382,12 @@ class SpectrometerThread(PiccoloWorkerThread):
         :type tasks: Queue.Queue
         :param results: the results queue from where results will be collected
         :type results: Queue.Queue
+        :param integration_times: queue for reporting integration times
+        :type results: Queue.Queue
         """
         PiccoloWorkerThread.__init__(self, name, busy, tasks, results)
         self._spec = spectrometer
-
-    @property
-    def currentIntegrationTime(self):
-        return self._spec.currentIntegrationTime
-    @currentIntegrationTime.setter
-    def currentIntegrationTime(self,milliseconds):
-        self._spec.currentIntegrationTime = milliseconds
-    @property
-    def minIntegrationTime(self):
-        return self._spec.minIntegrationTime
-    @minIntegrationTime.setter
-    def minIntegrationTime(self,milliseconds):
-        self._spec.minIntegrationTime = milliseconds
-    @property
-    def maxIntegrationTime(self):
-        return self._spec.maxIntegrationTime
-    @maxIntegrationTime.setter
-    def maxIntegrationTime(self,milliseconds):
-        self._spec.maxIntegrationTime = milliseconds
+        self._itQ = integration_times
   
     def run(self):
         while True:
@@ -426,7 +415,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             self._performAcquireTask(task)
         elif type(task) is AutointegrateTask:
             self._performAutointegrateTask(task)
-        elif type(task) is IntegrationTimeTask:
+        elif type(task) is MinMaxIntegrationTimeTask:
             self._performIntegrationTimeTask(task)
 
         # The task has completed, so unlock the spectrometer. The result of the
@@ -493,6 +482,18 @@ class SpectrometerThread(PiccoloWorkerThread):
         # write results to the result queue
         self.results.put(spectrum)
 
+    def _performIntegrationTimeTask(self,task):
+        self.log.debug("setting/getting integration times")
+        for t in ['minIntegrationTime','maxIntegrationTime']:
+            if getattr(task,t) is not None:
+                setattr(self._spec,t,getattr(task,t))
+        results = {}
+        for t in ['minIntegrationTime','maxIntegrationTime','currentIntegrationTime']:
+            results[t] = getattr(self._spec,t)
+        results['currentIntegrationTime'] = results['currentIntegrationTime'].getMilliseconds()
+        self._itQ.put(results)
+            
+            
 class PiccoloSpectrometer(PiccoloInstrument):
     """Class to communicate with a spectrometer."""
 
@@ -515,6 +516,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
         self._busy = threading.Lock()
         self._tQ = Queue() # Task queue.
         self._rQ = Queue() # Results queue.
+        self._itQ = Queue() # for getting the current integration times
 
         if spectrometer is None:
             self.log.warning('A PiccoloSpectrometer object has been created without a Spectrometer hadware object. This is usually only done for testing the Piccolo code. You should not see this message during normal operation.')
@@ -523,25 +525,35 @@ class PiccoloSpectrometer(PiccoloInstrument):
             self._serial = spectrometer.serialNumber
 
 
-        self._spectrometer = SpectrometerThread(name, spectrometer, self._busy, self._tQ, self._rQ)
+        self._spectrometer = SpectrometerThread(name, spectrometer, self._busy, self._tQ, self._rQ, self._itQ)
         self._spectrometer.start() # Start the thread.
+        self.updateIntegrationTimes() # get integration times
 
     def __del__(self):
         # send poison pill to worker
         self._tQ.put(None)
 
+    def updateIntegrationTimes(self,minIntegrationTime=None,maxIntegrationTime=None):
+        if self._busy.locked():
+            self.log.warning("busy, cannot manipulate integration times")
+            return 'nok: busy'
+        task = MinMaxIntegrationTimeTask(minTime=minIntegrationTime,maxTime=maxIntegrationTime)
+        self._tQ.put(task)
+        times = self._itQ.get()
+        self._currentIntegrationTime = times['currentIntegrationTime']
+        self._minIntegrationTime = times['minIntegrationTime']
+        self._maxIntegrationTime = times['maxIntegrationTime']
+        
     def getCurrentIntegrationTime(self):
-        return self._spectrometer.currentIntegrationTime
-    def setCurrentIntegrationTime(self,milliseconds):
-        self._spectrometer.currentIntegrationTime = milliseconds
+        return self._currentIntegrationTime
     def getMinIntegrationTime(self):
-        return self._spectrometer.minIntegrationTime
+        return self._minIntegrationTime
     def setMinIntegrationTime(self,milliseconds):
-        self._spectrometer.minIntegrationTime = milliseconds
+        self.updateIntegrationTimes(minIntegrationTime=milliseconds)
     def getMaxIntegrationTime(self):
-        return self._spectrometer.maxIntegrationTime
+        return self._maxIntegrationTime
     def setMaxIntegrationTime(self,milliseconds):
-        self._spectrometer.maxIntegrationTime = milliseconds
+        self.updateIntegrationTimes(maxIntegrationTime=milliseconds)
         
     def status(self):
         """return status of shutter

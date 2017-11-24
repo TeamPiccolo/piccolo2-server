@@ -1,3 +1,8 @@
+2017-11-24 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: improve methods to set min/max integration times
+ * piccolo2/server/PiccoloSpectrometer.py: add new task to set min/max
+   integration times
+
 2017-11-22 Magnus Hagdorn
  * piccolo2/pserver.py: get integration time config from config file
  * piccolo2/server/Piccolo.py: handle min/max integration time settings

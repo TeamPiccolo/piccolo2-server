@@ -111,6 +111,12 @@ class PiccoloThread(PiccoloWorkerThread):
                 return
             return cmd
 
+    def setMinIntegrationTime(self,spectrometer,milliseconds):
+        self._spectrometers[spectrometer].setMinIntegrationTime(milliseconds)
+
+    def setMaxIntegrationTime(self,spectrometer,milliseconds):
+        self._spectrometers[spectrometer].setMaxIntegrationTime(milliseconds)
+        
     def getCounter(self,key):
         if key not in self._outCounter:
             self._outCounter[key] = self._datadir.getNextCounter(key)
@@ -407,6 +413,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         self._messages.addMessage('ITmin|%s'%(spectrometer))
         self._minIntegrationTimes[spectrometer] = milliseconds
+        self._worker.setMinIntegrationTime(spectrometer,milliseconds)
         return 'ok'
     
     def setMaxIntegrationTime(self,spectrometer=None,milliseconds=1000.):
@@ -415,6 +422,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         self._messages.addMessage('ITmax|%s'%(spectrometer))
         self._maxIntegrationTimes[spectrometer] = milliseconds
+        self._worker.setMaxIntegrationTime(spectrometer,milliseconds)
         return 'ok'
     
     def setIntegrationTimeManual(self, shutter=None, spectrometer=None, milliseconds=1000.):
