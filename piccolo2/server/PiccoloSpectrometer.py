@@ -584,14 +584,14 @@ class PiccoloSpectrometer(PiccoloInstrument):
                 'maxIntegrationTime' : self.getMaxIntegrationTime(),
                 }
 
-    def acquire(self, milliseconds=100, dark=False, upwelling=False):
+    def acquire(self, milliseconds=100, dark=False, shutter='upwelling'):
         """Start acquiring ("recording") a spectrum.
 
         :param milliseconds: the integration time in milliseconds
         :param dark: whether a dark spectrum is recorded
         :type dark: bool
-        :param upwelling: with the direction is upwelling
-        :type upwelling: bool
+        :param upwelling: the name of the shutter
+        :type shutter: string
         :return: "ok" if command successful or "nok: message" if something went wrong
         """
 
@@ -607,10 +607,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
         task = AcquireTask()
         task.integrationTime = milliseconds
         task.dark = dark
-        if upwelling is True:
-            task.direction = 'upwelling'
-        else:
-            task.direction = 'downwelling'
+        task.direction = shutter
 
         # Put the task onto the task queue. This will get picked up by
         # SpectrometerThread (if it is running).

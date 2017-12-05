@@ -1,4 +1,11 @@
 2017-12-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: integration times are managed by worker thread,
+   round integration times, fix batch number
+ * piccolo2/server/PiccoloDataDir.py: fix batch number
+ * piccolo2/server/PiccoloSpectrometer.py: pass shutter name rather than
+   direction
+
+2017-12-05 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: autointegration can happen periodically
 
 2017-11-24 Magnus Hagdorn

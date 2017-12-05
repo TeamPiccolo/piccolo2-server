@@ -140,7 +140,8 @@ class PiccoloDataDir(object):
         for f in self.getFileList(path,pattern):
             f = os.path.basename(f).split('_')[0]
             try:
-                m = int(f)
+                # start after first character because file name starts with a b
+                m = int(f[1:])
             except:
                 continue
             nextCounter = max(nextCounter,m)
