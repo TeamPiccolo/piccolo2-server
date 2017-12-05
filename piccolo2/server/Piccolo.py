@@ -294,7 +294,7 @@ class PiccoloThread(PiccoloWorkerThread):
                     for shutter in self._shutters:
                         for s in self.record(shutter,dark):
                             # Insert the batch and sequence numbers into the metadata.
-                            s.update({'Batch': batchNr})
+                            s.update({'Batch': batchNr,'Run':outDir})
                             spectra.append(s)
                         # check for abort/shutdown
                         cmd = self._getCommands(block=False)
