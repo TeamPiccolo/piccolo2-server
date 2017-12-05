@@ -1,3 +1,6 @@
+2017-12-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: autointegration can happen periodically
+
 2017-11-24 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: improve methods to set min/max integration times
  * piccolo2/server/PiccoloSpectrometer.py: add new task to set min/max

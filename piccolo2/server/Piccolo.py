@@ -105,7 +105,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 return
             return cmd
         else:
-            assert len(cmd)==4
+            assert len(cmd)==5
             if self.busy.locked():
                 self.log.warn('already recording data')
                 return
@@ -189,9 +189,9 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.busy.release()
                 self.log.info("finished autointegration")
                 continue
-            elif len(task) == 4:
+            elif len(task) == 5:
                 # get task
-                (integrationTime,outDir,nCycles,delay) = task
+                (integrationTime,outDir,nCycles,delay,auto) = task
             else:
                 # nothing interesting, get the next command
                 continue
@@ -200,6 +200,12 @@ class PiccoloThread(PiccoloWorkerThread):
             self.log.info("start recording {}".format(nCycles))
             self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
+            # run initial autointegration if requested
+            if auto == 0:
+                self.log.info("start autointegration")
+                self.autoIntegrate()
+                self.log.info("finished autointegration")
+            
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
             prefix = os.path.join(outDir,'b{0:06d}_s'.format(self.getCounter(outDir)))
@@ -224,6 +230,12 @@ class PiccoloThread(PiccoloWorkerThread):
                         dark = True
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
+
+                if auto>0 and (n-1)%auto==0:
+                    self.log.info("start autointegration")
+                    self.autoIntegrate()
+                    self.log.info("finished autointegration")
+                
                 # Define the pattern to use. The pattern is a list of tuples
                 # (a, b). a is the type of the spectrum, True for "dark",
                 # False for "light". b is the direction, True for "upwelling",
@@ -504,7 +516,7 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._maxIntegrationTimes[spectrometer]
     
-    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
+    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=-1,timeout=30.):
         """record spectra
 
         :param outDir: name of output directory
@@ -516,14 +528,7 @@ class Piccolo(PiccoloInstrument):
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
-        if auto:
-            result = self.setIntegrationTimeAuto()
-            if result != 'ok':
-                return result
-            result = self.checkAutoIntegrationResults(block=True,timeout=timeout)
-            if result != 'ok':
-                return result
-        self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
+        self._tQ.put((self._integrationTimes,outDir,nCycles,delay,auto))
         return 'ok'
 
     def dark(self):
