@@ -1,3 +1,7 @@
+2017-12-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloSpectrometer.py: catch all exceptions and only report
+   them when autointegration fails
+
 2017-12-05 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: store Run name in meta data
 
