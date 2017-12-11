@@ -1,3 +1,8 @@
+2017-12-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloDispatcher.py: hook up quiet time methods
+ * piccolo2/server/PiccoloScheduler.py: add methods to set/get quiet time, a
+   period during which the scheduler is suspended
+
 2017-12-05 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: store Run name in meta data
 
