@@ -386,6 +386,12 @@ class Piccolo(PiccoloInstrument):
 
         self._messages = PiccoloMessages()
 
+        # the current run
+        try:
+            self._currentRun = self._datadir.getRunList()[-1]
+        except:
+            self._currentRun = 'spectra'
+        
         # integration times
         self._integrationTimes = {}
         for shutter in self.getShutterList():
@@ -559,6 +565,7 @@ class Piccolo(PiccoloInstrument):
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
+        self._currentRun = outDir
         self._tQ.put(('record',outDir,nCycles,delay,auto))
         return 'ok'
 
@@ -696,6 +703,14 @@ class Piccolo(PiccoloInstrument):
             return cmdPipe.stdout.read()
         return ''
 
+    def getRunList(self):
+        """get a list of all runs"""
+        return self._datadir.getRunList()
+    
+    def getCurrentRun(self):
+        """get the name of the current run directory"""
+        return self._currentRun
+    
     def getLocation(self):
         """get current GPS location and metadata"""
         return self._gps.getRecord()

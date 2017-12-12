@@ -1,4 +1,10 @@
 2017-12-12 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: store current run directory and report it to
+   client
+ * piccolo2/server/PiccoloDataDir.py: add method to get list of runs
+   (directories) sorted by mtime
+
+2017-12-12 Magnus Hagdorn
  * piccolo2/server/PiccoloScheduler.py: fix quiet time
 
 2017-12-12 Magnus Hagdorn

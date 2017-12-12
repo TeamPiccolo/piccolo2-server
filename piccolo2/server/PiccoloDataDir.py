@@ -135,6 +135,16 @@ class PiccoloDataDir(object):
             fileList.append(os.path.relpath(f,self.datadir))
         return fileList[haveNFiles:]
 
+    def getRunList(self):
+        runs = []
+        for p in os.listdir(self.datadir):
+            print p
+            if os.path.isdir(self.join(p)):
+                runs.append(p)
+        # sort by mtime
+        runs.sort(key=lambda p: os.path.getmtime(self.join(p)))
+        return runs
+    
     def getNextCounter(self,path,pattern='*.pico*'):
         nextCounter = 0
         for f in self.getFileList(path,pattern):
