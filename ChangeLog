@@ -1,4 +1,7 @@
 2017-12-12 Magnus Hagdorn
+ * piccolo2/server/PiccoloScheduler.py: fix quiet time
+
+2017-12-12 Magnus Hagdorn
  * piccolo2/server/PiccoloScheduler.py: handle case when quiet time is during
    the night across day boundary; log start and end of quiet time
 

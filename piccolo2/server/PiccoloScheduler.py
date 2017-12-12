@@ -260,14 +260,13 @@ class PiccoloScheduler(PiccoloInstrument):
         inQuietTime = False
         if self.quietStart is not None:
             now = datetime.datetime.now()
-            if self.quietStart > self.quietEnd:
-                # across day boundary
-                morning = datetime.datetime.combine(now.date(),datetime.time(0,0))
-                if morning < now.time() < self.quietStart or self.quietEnd < now < morning + datetime.timedelta(1):
-                    inQuietTime = True
-            else:
-                if self.quietStart < datetime.datetime.now().time() < self.quietEnd:
-                    inQuietTime = True
+            qs = datetime.datetime.combine(now.date(),self.quietStart)
+            qe = datetime.datetime.combine(now.date(),self.quietEnd)
+            if qs > qe:
+                # add a day to account for day boundary
+                qe = qe + datetime.timedelta(1)
+            if qs < now < qe:
+                inQuietTime = True
         if inQuietTime:
             if not self._loggedQuietTime:
                 self.log.info("quiet time started, not scheduling any jobs")
