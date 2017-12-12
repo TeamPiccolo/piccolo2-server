@@ -1,4 +1,7 @@
 2017-12-12 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: send a message when the output dir changes
+
+2017-12-12 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: store current run directory and report it to
    client
  * piccolo2/server/PiccoloDataDir.py: add method to get list of runs

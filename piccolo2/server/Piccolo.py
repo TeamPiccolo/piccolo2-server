@@ -565,7 +565,9 @@ class Piccolo(PiccoloInstrument):
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
-        self._currentRun = outDir
+        if outDir != self._currentRun:
+            self._currentRun = outDir
+            self._messages.addMessage('CR|%s'%outDir)
         self._tQ.put(('record',outDir,nCycles,delay,auto))
         return 'ok'
 
