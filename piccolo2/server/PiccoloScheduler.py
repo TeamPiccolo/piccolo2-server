@@ -180,6 +180,7 @@ class PiccoloScheduler(PiccoloInstrument):
         PiccoloInstrument.__init__(self,"scheduler")
         
         self._jobs = []
+        self._loggedQuietTime = False
         self._quietStart = None
         self._quietEnd = None
 
@@ -198,8 +199,6 @@ class PiccoloScheduler(PiccoloInstrument):
     @quietStart.setter
     def quietStart(self,t):
         v = self._parseTime(t)
-        if v is not None and self._quietEnd is not None:
-            assert v < self._quietEnd
         self._quietStart = v
     @property
     def quietEnd(self):
@@ -209,8 +208,6 @@ class PiccoloScheduler(PiccoloInstrument):
     @quietEnd.setter
     def quietEnd(self,t):
         v = self._parseTime(t)
-        if v is not None and self._quietStart is not None:
-            assert v > self._quietStart
         self._quietEnd = v
 
 
@@ -260,9 +257,26 @@ class PiccoloScheduler(PiccoloInstrument):
     @property
     def runable_jobs(self):
         """get iterator over runable jobs"""
-        if self.quietStart is not None and self.quietStart < datetime.datetime.now().time() < self.quietEnd:
+        inQuietTime = False
+        if self.quietStart is not None:
+            now = datetime.datetime.now()
+            if self.quietStart > self.quietEnd:
+                # across day boundary
+                morning = datetime.datetime.combine(now.date(),datetime.time(0,0))
+                if morning < now.time() < self.quietStart or self.quietEnd < now < morning + datetime.timedelta(1):
+                    inQuietTime = True
+            else:
+                if self.quietStart < datetime.datetime.now().time() < self.quietEnd:
+                    inQuietTime = True
+        if inQuietTime:
+            if not self._loggedQuietTime:
+                self.log.info("quiet time started, not scheduling any jobs")
+                self._loggedQuietTime = True
             return []
         else:
+            if self._loggedQuietTime:
+                self.log.info("quiet time stopped, scheduling jobs again")
+                self._loggedQuietTime = False
             return (job for job in self._jobs if job.shouldRun)
 
     @property
