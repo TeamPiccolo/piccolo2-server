@@ -1,3 +1,7 @@
+2017-12-13 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: use state queue to update worker state and
+   populate extended status object
+
 2017-12-12 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: send a message when the output dir changes
 
