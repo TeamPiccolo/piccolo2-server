@@ -83,7 +83,6 @@ def piccolo_server(serverCfg):
     spectrometers = {}
     if HAVE_PICCOLO_DRIVER:
         for s in piccolo_spectrometers.getConnectedSpectrometers():
-
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
@@ -97,16 +96,18 @@ def piccolo_server(serverCfg):
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
     # Go through each of the detected spectrometers in turn and check for custom settings recorded in the instrument configuration file.
     for sname in spectrometers:
+        # Convert the sname to the serial number.
+        spectrometer_serial_number = spectrometers[sname]._serial
         if sname[2:] in piccoloCfg.cfg['spectrometers']:
             log.info('Found custom settings for spectrometer {} in the instrument configuration file {}.'.format(
-                sname[2:],
+                spectrometer_serial_number,
                 cfgFilename
             ))
             spectrometers[sname].minIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['min_integration_time']
             spectrometers[sname].maxIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['max_integration_time']
         else:
-            log.info('Did not find any custom settings for spectrometer {} in the instrument configuration file {}.'.format(
-                sname[2:],
+            log.info('Did not find any custom settings for spectrometer {} in the instrument configuration file {}. Using the defaults for this spectrometer model.'.format(
+                spectrometer_serial_number,
                 cfgFilename
             ))
         pd.registerComponent(spectrometers[sname])
