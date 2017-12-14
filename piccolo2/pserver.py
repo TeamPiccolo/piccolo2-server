@@ -35,7 +35,7 @@ def piccolo_server(serverCfg):
     log = logging.getLogger("piccolo.server")
 
     log.info("piccolo2 server version %s"%piccolo.__version__)
-    
+
     # setup the blinking status led
     piccolo.StatusLED.start()
 
@@ -51,9 +51,10 @@ def piccolo_server(serverCfg):
     # Server is shut down.
     pd = piccolo.PiccoloDispatcher(daemon=True)
 
-    # read the piccolo configuration
+    # read the piccolo instrument configuration file
     piccoloCfg = piccolo.PiccoloConfig()
-    piccoloCfg.readCfg(pData.join(serverCfg.cfg['config']))
+    cfgFilename = pData.join(serverCfg.cfg['config']) # Usually /mnt/piccolo2_data/piccolo.config
+    piccoloCfg.readCfg(cfgFilename)
 
     # initialise the shutters
     ok=True
@@ -94,10 +95,20 @@ def piccolo_server(serverCfg):
             else:
                 s = None
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
+    # Go through each of the detected spectrometers in turn and check for custom settings recorded in the instrument configuration file.
     for sname in spectrometers:
         if sname[2:] in piccoloCfg.cfg['spectrometers']:
+            log.info('Found custom settings for spectrometer {} in the instrument configuration file {}.'.format(
+                sname[2:],
+                cfgFilename
+            ))
             spectrometers[sname].minIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['min_integration_time']
             spectrometers[sname].maxIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['max_integration_time']
+        else:
+            log.info('Did not find any custom settings for spectrometer {} in the instrument configuration file {}.'.format(
+                sname[2:],
+                cfgFilename
+            ))
         pd.registerComponent(spectrometers[sname])
 
     # initialize the gps
