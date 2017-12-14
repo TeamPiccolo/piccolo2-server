@@ -26,6 +26,7 @@ import os.path
 import logging
 from configobj import ConfigObj, flatten_errors
 from validate import Validator
+from pprint import pprint as pretty # To pretty-print output when testing.
 
 # the defaults
 defaultCfgStr = """
@@ -96,4 +97,4 @@ if __name__ == '__main__':
     if len(sys.argv)>1:
         cfg.readCfg(sys.argv[1])
 
-    print cfg.cfg
+    print pretty(cfg.cfg.dict())
