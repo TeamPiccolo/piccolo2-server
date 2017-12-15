@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2014-2016 The Piccolo Team
 #
 # This file is part of piccolo2-server.
@@ -94,22 +95,33 @@ def piccolo_server(serverCfg):
             else:
                 s = None
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
-    # Go through each of the detected spectrometers in turn and check for custom settings recorded in the instrument configuration file.
+    # Set the spectrometer temperatures (for spectrometers that have a settable detector temperature).
+    hasTEC = dict() # The spectrometer has a TEC and its temperature can be adjusted.
+    temperaturesToSet = dict()
     for sname in spectrometers:
-        # Convert the sname to the serial number.
-        spectrometer_serial_number = spectrometers[sname]._serial
+        spectrometer_serial_number = spectrometers[sname]._spectrometer._spec.serialNumber
+        hasTEC[spectrometer_serial_number] = spectrometers[sname]._spectrometer._spec.detectorTemperatureCanBeSet
+    for spectrometer_serial_number in piccoloCfg.cfg['spectrometers']:
+        spectrometer_custom_configuration = piccoloCfg.cfg['spectrometers'][spectrometer_serial_number]
+        if 'temperatureDetectorSet' in spectrometer_custom_configuration:
+            temperature = spectrometer_custom_configuration['temperatureDetectorSet']
+            temperaturesToSet[spectrometer_serial_number] = temperature
+    # Log warnings if necessary.
+    log.info('{}'.format(hasTEC)) # ...need to format meaningfully.
+    log.info('{}'.format(temperaturesToSet)) # ...need to format meaningfully.
+    # Convert the sname to the serial number.
+    #spectrometer_manufacturer = spectrometers[sname]._spectrometer._spec.manufacturer
+    #spectrometer_model = spectrometers[sname]._spectrometer._spec.model
+    # Does the spectrometer have a thermoelectric cooler (TEC)?
+
+#    if hasTEC:
+#        log.info('The {} {} {} has a thermoelectric cooler.'.format(spectrometer_manufacturer, spectrometer_model, spectrometer_serial_number))
+#    else:
+#        log.info('The {} {} {} does not have any thermoelectric cooler.'.format(spectrometer_manufacturer, spectrometer_model, spectrometer_serial_number))
+    for sname in spectrometers:
         if sname[2:] in piccoloCfg.cfg['spectrometers']:
-            log.info('Found custom settings for spectrometer {} in the instrument configuration file {}.'.format(
-                spectrometer_serial_number,
-                cfgFilename
-            ))
             spectrometers[sname].minIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['min_integration_time']
             spectrometers[sname].maxIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['max_integration_time']
-        else:
-            log.info('Did not find any custom settings for spectrometer {} in the instrument configuration file {}. Using the defaults for this spectrometer model.'.format(
-                spectrometer_serial_number,
-                cfgFilename
-            ))
         pd.registerComponent(spectrometers[sname])
 
     # initialize the gps
