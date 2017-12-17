@@ -104,11 +104,19 @@ def piccolo_server(serverCfg):
     for spectrometer_serial_number in piccoloCfg.cfg['spectrometers']:
         spectrometer_custom_configuration = piccoloCfg.cfg['spectrometers'][spectrometer_serial_number]
         if 'temperatureDetectorSet' in spectrometer_custom_configuration:
-            temperature = spectrometer_custom_configuration['temperatureDetectorSet']
+            temperature = spectrometer_custom_configuration['temperatureDetectorSet'] # This appears to read a string, not a float.
             temperaturesToSet[spectrometer_serial_number] = temperature
     # Log warnings if necessary.
     log.info('{}'.format(hasTEC)) # ...need to format meaningfully.
     log.info('{}'.format(temperaturesToSet)) # ...need to format meaningfully.
+
+    for s in temperaturesToSet:
+        if s in hasTEC:
+            for sname in spectrometers:
+                if spectrometers[sname]._spectrometer._spec.serialNumber == s:
+                    log.info('Setting the detector temperature of {} to {} °C...'.format(sname, temperaturesToSet[s]))
+                    spectrometers[sname]._spectrometer._spec.set_tec_setpoint(float(temperaturesToSet[s]))
+            #set_tec_setpoint(temperaturesToSet)
     # Convert the sname to the serial number.
     #spectrometer_manufacturer = spectrometers[sname]._spectrometer._spec.manufacturer
     #spectrometer_model = spectrometers[sname]._spectrometer._spec.model
@@ -168,7 +176,6 @@ def main():
     handler = piccolo.piccoloLogging(logfile=serverCfg.cfg['logging']['logfile'],
                                      debug=serverCfg.cfg['logging']['debug'])
     log = logging.getLogger("piccolo.server")
-
 
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
