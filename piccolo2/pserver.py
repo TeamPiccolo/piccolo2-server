@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2014-2016 The Piccolo Team
 #
 # This file is part of piccolo2-server.
@@ -35,7 +36,7 @@ def piccolo_server(serverCfg):
     log = logging.getLogger("piccolo.server")
 
     log.info("piccolo2 server version %s"%piccolo.__version__)
-    
+
     # setup the blinking status led
     piccolo.StatusLED.start()
 
@@ -51,9 +52,10 @@ def piccolo_server(serverCfg):
     # Server is shut down.
     pd = piccolo.PiccoloDispatcher(daemon=True)
 
-    # read the piccolo configuration
+    # read the piccolo instrument configuration file
     piccoloCfg = piccolo.PiccoloConfig()
-    piccoloCfg.readCfg(pData.join(serverCfg.cfg['config']))
+    cfgFilename = pData.join(serverCfg.cfg['config']) # Usually /mnt/piccolo2_data/piccolo.config
+    piccoloCfg.readCfg(cfgFilename)
 
     # initialise the shutters
     ok=True
@@ -82,7 +84,6 @@ def piccolo_server(serverCfg):
     spectrometers = {}
     if HAVE_PICCOLO_DRIVER:
         for s in piccolo_spectrometers.getConnectedSpectrometers():
-
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
@@ -94,6 +95,37 @@ def piccolo_server(serverCfg):
             else:
                 s = None
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
+    # Set the spectrometer temperatures (for spectrometers that have a settable detector temperature).
+    hasTEC = dict() # The spectrometer has a TEC and its temperature can be adjusted.
+    temperaturesToSet = dict()
+    for sname in spectrometers:
+        spectrometer_serial_number = spectrometers[sname]._spectrometer._spec.serialNumber
+        hasTEC[spectrometer_serial_number] = spectrometers[sname]._spectrometer._spec.detectorTemperatureCanBeSet
+    for spectrometer_serial_number in piccoloCfg.cfg['spectrometers']:
+        spectrometer_custom_configuration = piccoloCfg.cfg['spectrometers'][spectrometer_serial_number]
+        if 'temperatureDetectorSet' in spectrometer_custom_configuration:
+            temperature = spectrometer_custom_configuration['temperatureDetectorSet'] # This appears to read a string, not a float.
+            temperaturesToSet[spectrometer_serial_number] = temperature
+    # Log warnings if necessary.
+    log.info('{}'.format(hasTEC)) # ...need to format meaningfully.
+    log.info('{}'.format(temperaturesToSet)) # ...need to format meaningfully.
+
+    for s in temperaturesToSet:
+        if s in hasTEC:
+            for sname in spectrometers:
+                if spectrometers[sname]._spectrometer._spec.serialNumber == s:
+                    log.info('Setting the detector temperature of {} to {} °C...'.format(sname, temperaturesToSet[s]))
+                    spectrometers[sname]._spectrometer._spec.set_tec_setpoint(float(temperaturesToSet[s]))
+            #set_tec_setpoint(temperaturesToSet)
+    # Convert the sname to the serial number.
+    #spectrometer_manufacturer = spectrometers[sname]._spectrometer._spec.manufacturer
+    #spectrometer_model = spectrometers[sname]._spectrometer._spec.model
+    # Does the spectrometer have a thermoelectric cooler (TEC)?
+
+#    if hasTEC:
+#        log.info('The {} {} {} has a thermoelectric cooler.'.format(spectrometer_manufacturer, spectrometer_model, spectrometer_serial_number))
+#    else:
+#        log.info('The {} {} {} does not have any thermoelectric cooler.'.format(spectrometer_manufacturer, spectrometer_model, spectrometer_serial_number))
     for sname in spectrometers:
         if sname[2:] in piccoloCfg.cfg['spectrometers']:
             spectrometers[sname].minIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['min_integration_time']
@@ -144,7 +176,6 @@ def main():
     handler = piccolo.piccoloLogging(logfile=serverCfg.cfg['logging']['logfile'],
                                      debug=serverCfg.cfg['logging']['debug'])
     log = logging.getLogger("piccolo.server")
-
 
     if serverCfg.cfg['daemon']['daemon']:
         import daemon
