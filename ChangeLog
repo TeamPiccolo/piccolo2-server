@@ -1,3 +1,7 @@
+2017-12-18 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: introduce class to manage integration times;
+   use it; add method to get/set integration time source
+
 2017-12-13 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: use state queue to update worker state and
    populate extended status object

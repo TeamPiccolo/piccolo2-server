@@ -41,6 +41,56 @@ import os.path, json
 import numpy
 import math
 
+class IntegrationTimes(object):
+    def __init__(self,shutters,spectrometers,callback=None):
+        self._shutters = shutters
+        self._spectrometers = spectrometers
+        self._integrationTime = {}
+        self._integrationTimeSource = {}
+        for shutter in self.shutters:
+            self._integrationTime[shutter] = {}
+            self._integrationTimeSource[shutter] = {}
+            for spec in self.spectrometers:
+                self._integrationTime[shutter][spec] = -1
+                self._integrationTimeSource[shutter][spec] = 0
+        self._callback = callback
+
+    @property
+    def shutters(self):
+        return self._shutters
+    @property
+    def spectrometers(self):
+        return self._spectrometers
+
+    def setTime(self,shutter,spectrometer,t,source=0):
+        changed=False
+        if abs(self._integrationTime[shutter][spectrometer] - t) > 1e-8:
+            changed = True
+            self._integrationTime[shutter][spectrometer] = t
+        if source != self._integrationTimeSource[shutter][spectrometer]:
+            changed = True
+            self._integrationTimeSource[shutter][spectrometer] = source
+        if self._callback is not None and changed:
+            self._callback(shutter,spectrometer,t,source)
+
+    def setSource(self,shutter,spectrometer,source):
+        if source != self._integrationTimeSource[shutter][spectrometer]:
+            self._integrationTimeSource[shutter][spectrometer] = source
+            if self._callback is not None:
+                self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),source)
+            
+    def getTime(self,shutter,spectrometer):
+        return self._integrationTime[shutter][spectrometer]
+
+    def getSource(self,shutter,spectrometer):
+        return self._integrationTimeSource[shutter][spectrometer]
+
+    def allChanged(self):
+        if self._callback is not None:
+            for shutter in self.shutters:
+                for spectrometer in self.spectrometers:
+                    self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),self.getSource(shutter,spectrometer))
+    
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
 
@@ -55,14 +105,15 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters = shutters
         self._spectrometers = spectrometers
         self._outCounter = {}
-        self._integrationTimes = {}
+        self._integrationTimes = IntegrationTimes(self._shutters.keys(),self._spectrometers.keys(),callback=self._itChanged)
         self._needDark = False
-        for shutter in shutters.keys():
-            self._integrationTimes[shutter] = {}
-            for spectrometer in self._spectrometers.keys():
-                self._integrationTimes[shutter][spectrometer] = self._spectrometers[spectrometer].getCurrentIntegrationTime()
         self._stateChanges = stateChanges
         self._file_incremented = file_incremented
+
+        # populate integration times object
+        for shutter in shutters.keys():
+            for spectrometer in self._spectrometers.keys():
+                self._integrationTimes.setTime(shutter,spectrometer,self._spectrometers[spectrometer].getCurrentIntegrationTime())
 
     def openShutter(self,shutter):
         self._shutters[shutter].openShutter()
@@ -70,8 +121,11 @@ class PiccoloThread(PiccoloWorkerThread):
     def closeShutter(self,shutter):
         self._shutters[shutter].closeShutter()
         self._stateChanges.put(('c',shutter))
+
+    def _itChanged(self,shutter,spectrometer,t,s):
+        self._stateChanges.put(('t',shutter,spectrometer,t,s))
         
-    def setIntegrationTime(self,shutter,spectrometer,milliseconds,roundup=True):
+    def setIntegrationTime(self,shutter,spectrometer,milliseconds,roundup=True,source=0):
         v = float(milliseconds)
         if roundup:
             n = 10**(math.floor(math.log10(v))-1)
@@ -79,14 +133,11 @@ class PiccoloThread(PiccoloWorkerThread):
                 v = (v//n+1)*n
         v = max(v,self._spectrometers[spectrometer].getMinIntegrationTime())
         v = min(v,self._spectrometers[spectrometer].getMaxIntegrationTime())
-        if abs(v - self._integrationTimes[shutter][spectrometer]) > 1e-8:
-            self._stateChanges.put(('t',shutter,spectrometer,v))
-            self._integrationTimes[shutter][spectrometer] = v
+        if abs(v - self._integrationTimes.getTime(shutter,spectrometer)) > 1e-8:
             self._needDark = True
+        self._integrationTimes.setTime(shutter,spectrometer,v,source)
     def getAllIntegrationTimes(self):
-        for shutter in self._shutters.keys():
-            for spectrometer in self._spectrometers.keys():
-                self._stateChanges.put(('t',shutter,spectrometer,self._integrationTimes[shutter][spectrometer]))
+        self._integrationTimes.allChanged()
         
     def _wait(self):
         time.sleep(0.2)
@@ -178,7 +229,9 @@ class PiccoloThread(PiccoloWorkerThread):
                 r=self._spectrometers[s].getAutointegrateResult()
                 self._stateChanges.put(('a',shutter,s,r.success))
                 if r.success:
-                    self.setIntegrationTime(shutter,s,r.bestIntegrationTime)
+                    self.setIntegrationTime(shutter,s,r.bestIntegrationTime,source=1)
+                else:
+                    self._integrationTimes.setSource(source=2) # indicate that the autointegration failed
             self.closeShutter(shutter)
         self._stateChanges.put(('a','stop'))
 
@@ -197,12 +250,12 @@ class PiccoloThread(PiccoloWorkerThread):
             else:
                 self.closeShutter(s)
 
-        for s in self._integrationTimes[shutter]:
-            self._spectrometers[s].acquire(milliseconds=self._integrationTimes[shutter][s],dark=dark,shutter=shutter)
+        for s in self._integrationTimes.spectrometers:
+            self._spectrometers[s].acquire(milliseconds=self._integrationTimes.getTime(shutter,s),dark=dark,shutter=shutter)
 
         self._wait()
         spectra = []
-        for s in self._integrationTimes[shutter]:
+        for s in self._integrationTimes.spectrometers:
             spectra.append(self._spectrometers[s].getSpectrum())
 
         self.closeShutter(shutter)
@@ -234,7 +287,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.setMaxIntegrationTime(task[1],task[2])
                 continue
             elif task[0] == 'setTime':
-                self.setIntegrationTime(task[1],task[2],task[3])
+                self.setIntegrationTime(task[1],task[2],task[3],source=0)
                 continue
             elif task[0] == 'record':
                 # get task
@@ -408,11 +461,7 @@ class Piccolo(PiccoloInstrument):
         self._extendedStatus = PiccoloExtendedStatus(spectrometers.keys(),shutters.keys())
             
         # integration times
-        self._integrationTimes = {}
-        for shutter in self.getShutterList():
-            self._integrationTimes[shutter] = {}
-            for spectrometer in self.getSpectrometerList():
-                self._integrationTimes[shutter][spectrometer] = -1
+        self._integrationTimes = IntegrationTimes(self.getShutterList(),self.getSpectrometerList(),callback=self._itChanged)
         self._minIntegrationTimes = {}
         self._maxIntegrationTimes = {}
         for spectrometer in self.getSpectrometerList():
@@ -436,19 +485,8 @@ class Piccolo(PiccoloInstrument):
         # update the integration times
         self._tQ.put("getTimes")
 
-    def _updateIntegrationTimes(self,update=False):
-        wait = False
-        if update:
-            self._tQ.put("getTimes")
-            wait = True
-        while True:
-            try:
-                shutter,spectrometer,milliseconds = self._timesQ.get(block=wait)
-            except Empty:
-                break
-            wait=False
-            self._integrationTimes[shutter][spectrometer] = milliseconds
-            self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
+    def _itChanged(self,shutter,spectrometer,t,s):
+        self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
         
     def getListenerID(self):
         """get a listener ID for use with messages"""
@@ -550,8 +588,19 @@ class Piccolo(PiccoloInstrument):
             return 'nok','unknown shutter: {}'.format(shutter)
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
-        return self._integrationTimes[shutter][spectrometer]
+        return self._integrationTimes.getTime(shutter,spectrometer)
 
+    def getIntegrationTimeSource(self,shutter=None,spectrometer=None):
+        """get the source of integration time
+
+        :param shutter: the shutter name
+        :param spectrometer: the spectrometer name"""
+        if shutter not in self.getShutterList():
+            return 'nok','unknown shutter: {}'.format(shutter)
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._integrationTimes.getSource(shutter,spectrometer)
+    
     def getMinIntegrationTime(self,spectrometer=None):
         """get the minimum integration time
 
@@ -615,9 +664,8 @@ class Piccolo(PiccoloInstrument):
                 break
 
             if sc[0] == 't':
-                shutter,spectrometer,milliseconds = sc[1:]
-                self._integrationTimes[shutter][spectrometer] = milliseconds
-                self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
+                shutter,spectrometer,milliseconds,source = sc[1:]
+                self._integrationTimes.setTime(shutter,spectrometer,milliseconds,source)
             elif sc[0] == 'o':
                 self._extendedStatus.open(sc[1])
             elif sc[0] == 'c':
