@@ -231,7 +231,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 if r.success:
                     self.setIntegrationTime(shutter,s,r.bestIntegrationTime,source=1)
                 else:
-                    self._integrationTimes.setSource(source=2) # indicate that the autointegration failed
+                    self._integrationTimes.setSource(shutter,s,source=2) # indicate that the autointegration failed
             self.closeShutter(shutter)
         self._stateChanges.put(('a','stop'))
 

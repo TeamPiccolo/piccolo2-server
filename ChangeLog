@@ -1,4 +1,7 @@
 2017-12-18 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: fix bug
+
+2017-12-18 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: introduce class to manage integration times;
    use it; add method to get/set integration time source
 
