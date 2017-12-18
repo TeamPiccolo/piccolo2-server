@@ -180,7 +180,56 @@ class PiccoloScheduler(PiccoloInstrument):
         PiccoloInstrument.__init__(self,"scheduler")
         
         self._jobs = []
+        self._loggedQuietTime = False
+        self._quietStart = None
+        self._quietEnd = None
 
+    @staticmethod
+    def _parseTime(t):
+        if t is None or isinstance(t,datetime.time):
+            return t
+        else:
+            return datetime.datetime.strptime(t,"%H:%M:%S").time()
+    
+    @property
+    def quietStart(self):
+        if self._quietEnd is None:
+            return None
+        return self._quietStart
+    @quietStart.setter
+    def quietStart(self,t):
+        v = self._parseTime(t)
+        self._quietStart = v
+    @property
+    def quietEnd(self):
+        if self._quietStart is None:
+            return None
+        return self._quietEnd
+    @quietEnd.setter
+    def quietEnd(self,t):
+        v = self._parseTime(t)
+        self._quietEnd = v
+
+
+    def setQuietTime(self,start_time=None,end_time=None):
+        """set the time period during which the scheduler is suspended
+        
+        :param start_time: the time at which the quiet period starts, disable when None
+        :type start_time: datetime.time or None
+        :param end_time: the time at which the quiet period ends, disable when None
+        :type end_time: datetime.time or None
+        """
+        self.log.info('setting quiet time to {} - {}'.format(start_time,end_time))
+        self.quietStart = start_time
+        self.quietEnd = end_time
+
+    def getQuietTime(self):
+        """return the quiet period as two strings"""
+        if self.quietStart is None:
+            return None,None
+        else:
+            return self.quietStart.isoformat(),self.quietEnd.isoformat()
+            
     def add(self,at_time,job,interval=None,end_time=None):
         """add a new job
 
@@ -208,7 +257,26 @@ class PiccoloScheduler(PiccoloInstrument):
     @property
     def runable_jobs(self):
         """get iterator over runable jobs"""
-        return (job for job in self._jobs if job.shouldRun)
+        inQuietTime = False
+        if self.quietStart is not None:
+            now = datetime.datetime.now()
+            qs = datetime.datetime.combine(now.date(),self.quietStart)
+            qe = datetime.datetime.combine(now.date(),self.quietEnd)
+            if qs > qe:
+                # add a day to account for day boundary
+                qe = qe + datetime.timedelta(1)
+            if qs < now < qe:
+                inQuietTime = True
+        if inQuietTime:
+            if not self._loggedQuietTime:
+                self.log.info("quiet time started, not scheduling any jobs")
+                self._loggedQuietTime = True
+            return []
+        else:
+            if self._loggedQuietTime:
+                self.log.info("quiet time stopped, scheduling jobs again")
+                self._loggedQuietTime = False
+            return (job for job in self._jobs if job.shouldRun)
 
     @property
     def jobs(self):
@@ -256,13 +324,21 @@ if __name__ == '__main__':
     piccoloLogging(debug=True)
 
     ps = PiccoloScheduler()
+
+    now = datetime.datetime.now()
     
-    ps.add(datetime.datetime.now()+datetime.timedelta(seconds=5),"hello")
-    ps.add(datetime.datetime.now()+datetime.timedelta(seconds=10),"hello2",interval=datetime.timedelta(seconds=5))
-    ps.add(datetime.datetime.now()+datetime.timedelta(seconds=8),"hello3",interval=datetime.timedelta(seconds=3),end_time=datetime.datetime.now()+datetime.timedelta(seconds=20))
+    ps.add(now+datetime.timedelta(seconds=5),"hello")
+    ps.add(now+datetime.timedelta(seconds=10),"hello2",interval=datetime.timedelta(seconds=5))
+    ps.add(now+datetime.timedelta(seconds=8),"hello3",interval=datetime.timedelta(seconds=3),end_time=datetime.datetime.now()+datetime.timedelta(seconds=20))
 
-    ps.add(datetime.datetime.now()-datetime.timedelta(seconds=5),"this should not be scheduled as in the past")
+    ps.add(now-datetime.timedelta(seconds=5),"this should not be scheduled as in the past")
 
+
+    qs = now+datetime.timedelta(seconds=60)
+    qe = now+datetime.timedelta(seconds=80)
+    
+    ps.setQuietTime(start_time=qs.time(),end_time=qe.time())
+    
     for i in range(0,100):
         for job in ps.runable_jobs:
             print job.jid, job.at_time, job.run()

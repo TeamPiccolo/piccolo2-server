@@ -1,3 +1,62 @@
+2017-12-18 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: introduce class to manage integration times;
+   use it; add method to get/set integration time source
+
+2017-12-13 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: use state queue to update worker state and
+   populate extended status object
+
+2017-12-12 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: send a message when the output dir changes
+
+2017-12-12 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: store current run directory and report it to
+   client
+ * piccolo2/server/PiccoloDataDir.py: add method to get list of runs
+   (directories) sorted by mtime
+
+2017-12-12 Magnus Hagdorn
+ * piccolo2/server/PiccoloScheduler.py: fix quiet time
+
+2017-12-12 Magnus Hagdorn
+ * piccolo2/server/PiccoloScheduler.py: handle case when quiet time is during
+   the night across day boundary; log start and end of quiet time
+
+2017-12-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloSpectrometer.py: catch all exceptions and only report
+   them when autointegration fails
+
+2017-12-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloDispatcher.py: hook up quiet time methods
+ * piccolo2/server/PiccoloScheduler.py: add methods to set/get quiet time, a
+   period during which the scheduler is suspended
+
+2017-12-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: store Run name in meta data
+
+2017-12-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: integration times are managed by worker thread,
+   round integration times, fix batch number
+ * piccolo2/server/PiccoloDataDir.py: fix batch number
+ * piccolo2/server/PiccoloSpectrometer.py: pass shutter name rather than
+   direction
+
+2017-12-05 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: autointegration can happen periodically
+
+2017-11-24 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: improve methods to set min/max integration times
+ * piccolo2/server/PiccoloSpectrometer.py: add new task to set min/max
+   integration times
+
+2017-11-22 Magnus Hagdorn
+ * piccolo2/pserver.py: get integration time config from config file
+ * piccolo2/server/Piccolo.py: handle min/max integration time settings
+ * piccolo2/server/PiccoloConfig.py: add option to set min/max integration
+   time
+ * piccolo2/server/PiccoloSpectrometer.py: handle min/max integration time
+   settings
+
 2017-11-20 Magnus Hagdorn
  * piccolo2/server/PiccoloStatusLED.py: avoid loading GPIO module
 

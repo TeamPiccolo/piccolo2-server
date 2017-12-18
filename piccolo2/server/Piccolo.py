@@ -27,7 +27,7 @@ from PiccoloDataDir import PiccoloDataDir
 from PiccoloWorkerThread import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
-from piccolo2.PiccoloStatus import PiccoloStatus
+from piccolo2.PiccoloStatus import PiccoloStatus, PiccoloExtendedStatus
 import PiccoloSimplify
 import socket
 import psutil
@@ -39,12 +39,64 @@ import time
 import logging
 import os.path, json
 import numpy
+import math
+
+class IntegrationTimes(object):
+    def __init__(self,shutters,spectrometers,callback=None):
+        self._shutters = shutters
+        self._spectrometers = spectrometers
+        self._integrationTime = {}
+        self._integrationTimeSource = {}
+        for shutter in self.shutters:
+            self._integrationTime[shutter] = {}
+            self._integrationTimeSource[shutter] = {}
+            for spec in self.spectrometers:
+                self._integrationTime[shutter][spec] = -1
+                self._integrationTimeSource[shutter][spec] = 0
+        self._callback = callback
+
+    @property
+    def shutters(self):
+        return self._shutters
+    @property
+    def spectrometers(self):
+        return self._spectrometers
+
+    def setTime(self,shutter,spectrometer,t,source=0):
+        changed=False
+        if abs(self._integrationTime[shutter][spectrometer] - t) > 1e-8:
+            changed = True
+            self._integrationTime[shutter][spectrometer] = t
+        if source != self._integrationTimeSource[shutter][spectrometer]:
+            changed = True
+            self._integrationTimeSource[shutter][spectrometer] = source
+        if self._callback is not None and changed:
+            self._callback(shutter,spectrometer,t,source)
+
+    def setSource(self,shutter,spectrometer,source):
+        if source != self._integrationTimeSource[shutter][spectrometer]:
+            self._integrationTimeSource[shutter][spectrometer] = source
+            if self._callback is not None:
+                self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),source)
+            
+    def getTime(self,shutter,spectrometer):
+        return self._integrationTime[shutter][spectrometer]
+
+    def getSource(self,shutter,spectrometer):
+        return self._integrationTimeSource[shutter][spectrometer]
+
+    def allChanged(self):
+        if self._callback is not None:
+            for shutter in self.shutters:
+                for spectrometer in self.spectrometers:
+                    self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),self.getSource(shutter,spectrometer))
+    
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
 
     LOGNAME = 'piccolo'
 
-    def __init__(self,name,datadir,shutters,spectrometers,gps,busy,paused,tasks,results,autoResults,file_incremented):
+    def __init__(self,name,datadir,shutters,spectrometers,gps,busy,paused,tasks,results,stateChanges,file_incremented):
 
         PiccoloWorkerThread.__init__(self,name,busy,tasks,results)
 
@@ -53,9 +105,40 @@ class PiccoloThread(PiccoloWorkerThread):
         self._shutters = shutters
         self._spectrometers = spectrometers
         self._outCounter = {}
-        self._autoResults = autoResults
+        self._integrationTimes = IntegrationTimes(self._shutters.keys(),self._spectrometers.keys(),callback=self._itChanged)
+        self._needDark = False
+        self._stateChanges = stateChanges
         self._file_incremented = file_incremented
 
+        # populate integration times object
+        for shutter in shutters.keys():
+            for spectrometer in self._spectrometers.keys():
+                self._integrationTimes.setTime(shutter,spectrometer,self._spectrometers[spectrometer].getCurrentIntegrationTime())
+
+    def openShutter(self,shutter):
+        self._shutters[shutter].openShutter()
+        self._stateChanges.put(('o',shutter))
+    def closeShutter(self,shutter):
+        self._shutters[shutter].closeShutter()
+        self._stateChanges.put(('c',shutter))
+
+    def _itChanged(self,shutter,spectrometer,t,s):
+        self._stateChanges.put(('t',shutter,spectrometer,t,s))
+        
+    def setIntegrationTime(self,shutter,spectrometer,milliseconds,roundup=True,source=0):
+        v = float(milliseconds)
+        if roundup:
+            n = 10**(math.floor(math.log10(v))-1)
+            if v/n>v//n:
+                v = (v//n+1)*n
+        v = max(v,self._spectrometers[spectrometer].getMinIntegrationTime())
+        v = min(v,self._spectrometers[spectrometer].getMaxIntegrationTime())
+        if abs(v - self._integrationTimes.getTime(shutter,spectrometer)) > 1e-8:
+            self._needDark = True
+        self._integrationTimes.setTime(shutter,spectrometer,v,source)
+    def getAllIntegrationTimes(self):
+        self._integrationTimes.allChanged()
+        
     def _wait(self):
         time.sleep(0.2)
 
@@ -97,20 +180,27 @@ class PiccoloThread(PiccoloWorkerThread):
                         return
                     else:
                         self.log.warn('acquisition paused')
-        elif cmd == 'dark':
+        elif cmd in ['dark','getTimes']:
             return cmd
         elif cmd == 'auto':
             if self.busy.locked():
                 self.log.warn('already recording data')
                 return
             return cmd
+        elif cmd[0] in ['setMinTime','setMaxTime']:
+            return cmd    
         else:
-            assert len(cmd)==4
             if self.busy.locked():
                 self.log.warn('already recording data')
                 return
             return cmd
 
+    def setMinIntegrationTime(self,spectrometer,milliseconds):
+        self._spectrometers[spectrometer].setMinIntegrationTime(milliseconds)
+
+    def setMaxIntegrationTime(self,spectrometer,milliseconds):
+        self._spectrometers[spectrometer].setMaxIntegrationTime(milliseconds)
+        
     def getCounter(self,key):
         if key not in self._outCounter:
             self._outCounter[key] = self._datadir.getNextCounter(key)
@@ -125,10 +215,11 @@ class PiccoloThread(PiccoloWorkerThread):
 
     def autoIntegrate(self):
         # close all shutters
+        self._stateChanges.put(('a','start'))
         for shutter in self._shutters:
-            self._shutters[shutter].closeShutter()
+            self.closeShutter(shutter)
         for shutter in self._shutters:
-            self._shutters[shutter].openShutter()
+            self.openShutter(shutter)
             # start autointegration
             for s in self._spectrometers:
                 self._spectrometers[s].autointegrate()
@@ -136,36 +227,39 @@ class PiccoloThread(PiccoloWorkerThread):
             # get results
             for s in self._spectrometers:
                 r=self._spectrometers[s].getAutointegrateResult()
-                self._autoResults.put((shutter,s,r))
-            self._shutters[shutter].closeShutter()
+                self._stateChanges.put(('a',shutter,s,r.success))
+                if r.success:
+                    self.setIntegrationTime(shutter,s,r.bestIntegrationTime,source=1)
+                else:
+                    self._integrationTimes.setSource(source=2) # indicate that the autointegration failed
+            self.closeShutter(shutter)
+        self._stateChanges.put(('a','stop'))
 
-    def record(self,integrationTime,dark=False,upwelling=False):
+    def record(self,shutter,dark=False):
+        self._stateChanges.put(('r','start'))
         if dark:
             darkStr = 'dark'
         else:
             darkStr = 'light'
-        if upwelling:
-            direction = 'upwelling'
-        else:
-            direction = 'downwelling'
-        self.log.info("Record {0} {1} spectra".format(darkStr,direction))
+        self.log.info("Record {0} {1} spectra".format(darkStr,shutter))
 
         # open/close shutters as required
-        for shutter in self._shutters:
-            if not dark and shutter == direction:
-                self._shutters[shutter].openShutter()
+        for s in self._shutters:
+            if not dark and s == shutter:
+                self.openShutter(s)
             else:
-                self._shutters[shutter].closeShutter()
+                self.closeShutter(s)
 
-        for s in integrationTime:
-            self._spectrometers[s].acquire(milliseconds=integrationTime[s],dark=dark,upwelling=upwelling)
+        for s in self._integrationTimes.spectrometers:
+            self._spectrometers[s].acquire(milliseconds=self._integrationTimes.getTime(shutter,s),dark=dark,shutter=shutter)
 
         self._wait()
         spectra = []
-        for s in integrationTime:
+        for s in self._integrationTimes.spectrometers:
             spectra.append(self._spectrometers[s].getSpectrum())
 
-        self._shutters[direction].closeShutter()
+        self.closeShutter(shutter)
+        self._stateChanges.put(('r','stop'))
         return spectra
 
     def run(self):
@@ -183,9 +277,21 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.busy.release()
                 self.log.info("finished autointegration")
                 continue
-            elif len(task) == 4:
+            elif task == 'getTimes':
+                self.getAllIntegrationTimes()
+                continue
+            elif task[0] ==  'setMinTime':
+                self.setMinIntegrationTime(task[1],task[2])
+                continue
+            elif task[0] == 'setMaxTime':
+                self.setMaxIntegrationTime(task[1],task[2])
+                continue
+            elif task[0] == 'setTime':
+                self.setIntegrationTime(task[1],task[2],task[3],source=0)
+                continue
+            elif task[0] == 'record':
                 # get task
-                (integrationTime,outDir,nCycles,delay) = task
+                (outDir,nCycles,delay,auto) = task[1:]
             else:
                 # nothing interesting, get the next command
                 continue
@@ -194,10 +300,16 @@ class PiccoloThread(PiccoloWorkerThread):
             self.log.info("start recording {}".format(nCycles))
             self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
+            # run initial autointegration if requested
+            if auto == 0:
+                self.log.info("start autointegration")
+                self.autoIntegrate()
+                self.log.info("finished autointegration")
+            
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
-            prefix = os.path.join(outDir,'b{0:06d}_s'.format(self.getCounter(outDir)))
-            dark = False # Default is "light"?
+            batchNr = self.getCounter(outDir)
+            prefix = os.path.join(outDir,'b{0:06d}_s'.format(batchNr))
             while True:
                 spectra = PiccoloSpectraList(seqNr=n)
                 spectra.prefix = prefix
@@ -215,33 +327,46 @@ class PiccoloThread(PiccoloWorkerThread):
                     elif cmd=='shutdown':
                         return
                     elif cmd=='dark':
-                        dark = True
+                        self._needDark = True
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
-                # Define the pattern to use. The pattern is a list of tuples
-                # (a, b). a is the type of the spectrum, True for "dark",
-                # False for "light". b is the direction, True for "upwelling",
-                # False for "downwelling".
-                if n==1 or n==nCycles or dark: # Only record dark spectra at the beginning or end of a batch.
-                    pattern = [(True,True),(False,True),(False,False),(True,False)] # Upwelling dark, upwelling light, downwelling light, downwelling dark.
-                else:
-                    pattern = [(False,True),(False,False)] # Upwelling light, downwelling light.
-                dark = False
-                for p in pattern:
-                    if p[1]:
-                        direction = 'upwelling'
+
+                if auto>0 and (n-1)%auto==0:
+                    self.log.info("start autointegration")
+                    self.autoIntegrate()
+                    self.log.info("finished autointegration")
+
+                
+                # order of dark/light measurements
+                # * the first sequence of a batch or when a dark measurement is required is dark
+                # * then do a light measurement
+                # * if it is the last sequence in a batch record a dark measurement
+                # ** but if the first measurement is already a dark one swap measurements
+                #
+                # so at most two measurements are taken (one dark and one light)
+                measurements = []
+                if n==1 or self._needDark:
+                    measurements.append(True) 
+                measurements.append(False)
+                if n==nCycles:
+                    if not measurements[0]:
+                        measurements.append(True)
                     else:
-                        direction = 'downwelling'
-                    for s in self.record(integrationTime[direction],dark=p[0],upwelling=p[1]):
-                        # Insert the batch and sequence numbers into the metadata.
-                        s.update({'Batch': self.getCounter(outDir)})
-                        spectra.append(s)
-                    # check for abort/shutdown
-                    cmd = self._getCommands(block=False)
+                        measurements.reverse()
+
+                # loop over measurements
+                for dark in measurements:
+                    for shutter in self._shutters:
+                        for s in self.record(shutter,dark):
+                            # Insert the batch and sequence numbers into the metadata.
+                            s.update({'Batch': batchNr,'Run':outDir})
+                            spectra.append(s)
+                        # check for abort/shutdown
+                        cmd = self._getCommands(block=False)
+                    if dark:
+                        self._needDark = False
                     if cmd in ['abort','shutdown']:
                         break
-                    if cmd == 'dark':
-                        dark = True
 
                 if cmd=='abort':
                     break
@@ -326,27 +451,43 @@ class Piccolo(PiccoloInstrument):
 
         self._messages = PiccoloMessages()
 
+        # the current run
+        try:
+            self._currentRun = self._datadir.getRunList()[-1]
+        except:
+            self._currentRun = 'spectra'
+
+        # the extended status
+        self._extendedStatus = PiccoloExtendedStatus(spectrometers.keys(),shutters.keys())
+            
         # integration times
-        self._integrationTimes = {}
-        for shutter in self.getShutterList():
-            self._integrationTimes[shutter] = {}
-            for spectrometer in self.getSpectrometerList():
-                self._integrationTimes[shutter][spectrometer] = 1000
+        self._integrationTimes = IntegrationTimes(self.getShutterList(),self.getSpectrometerList(),callback=self._itChanged)
+        self._minIntegrationTimes = {}
+        self._maxIntegrationTimes = {}
+        for spectrometer in self.getSpectrometerList():
+            self._minIntegrationTimes[spectrometer] = spectrometers[spectrometer].getMinIntegrationTime()
+            self._maxIntegrationTimes[spectrometer] = spectrometers[spectrometer].getMaxIntegrationTime()
 
         # handling the worker thread
         self._busy = threading.Lock()
         self._paused = threading.Lock()
         self._tQ = Queue()
         self._rQ = Queue()
-        self._aQ = Queue()
+        self._sQ = Queue()
         self._file_incremented = threading.Event()
-        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers, gps, self._busy,self._paused,self._tQ,self._rQ, self._aQ,self._file_incremented)
+        self._worker = PiccoloThread(name,self._datadir,shutters,spectrometers, gps, self._busy,self._paused,self._tQ,self._rQ, self._sQ,self._file_incremented)
         self._worker.start()
 
         # handling the output thread
         self._output = PiccoloOutput(name,self._datadir,self._rQ,clobber=clobber,split=split)
         self._output.start()
 
+        # update the integration times
+        self._tQ.put("getTimes")
+
+    def _itChanged(self,shutter,spectrometer,t,s):
+        self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
+        
     def getListenerID(self):
         """get a listener ID for use with messages"""
         return self._messages.newListener()
@@ -392,10 +533,27 @@ class Piccolo(PiccoloInstrument):
             return 'nok','unknown shutter: {}'.format(shutter)
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
-        self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
-        self._integrationTimes[shutter][spectrometer] = milliseconds
+        self._tQ.put(("setTime",shutter,spectrometer,milliseconds))
         return 'ok'
 
+    def setMinIntegrationTime(self,spectrometer=None,milliseconds=1000.):
+        """set the minimum integration time"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        self._messages.addMessage('ITmin|%s'%(spectrometer))
+        self._minIntegrationTimes[spectrometer] = milliseconds
+        self._worker.setMinIntegrationTime(spectrometer,milliseconds)
+        return 'ok'
+    
+    def setMaxIntegrationTime(self,spectrometer=None,milliseconds=1000.):
+        """set the maximum integration time"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        self._messages.addMessage('ITmax|%s'%(spectrometer))
+        self._maxIntegrationTimes[spectrometer] = milliseconds
+        self._worker.setMaxIntegrationTime(spectrometer,milliseconds)
+        return 'ok'
+    
     def setIntegrationTimeManual(self, shutter=None, spectrometer=None, milliseconds=1000.):
         """Set the integration time manually.
 
@@ -403,7 +561,7 @@ class Piccolo(PiccoloInstrument):
         """
         self.setIntegrationTime(shutter, spectrometer, milliseconds)
 
-    def setIntegrationTimeAuto(self, max=None):
+    def setIntegrationTimeAuto(self):
         """Sets the integration time automatically.
 
         The max parameter is the maximum integration time (in milliseconds)
@@ -421,33 +579,6 @@ class Piccolo(PiccoloInstrument):
         self._tQ.put('auto')
         return 'ok'
 
-    def checkAutoIntegrationResults(self,block=False,timeout=30.):
-        """check autointegration results
-
-        :param block: wait until results are available - default do not block
-        :param timeout: when block is True wait at most timeout seconds
-        """
-        haveResults=False
-        success=True
-        while True:
-            try:
-                shutter,spectrometer,results = self._aQ.get(block=block,timeout=timeout)
-            except Empty:
-                if block:
-                    if not haveResults:
-                        return 'nok: autointegration has not finished within time limit'
-                    if not success:
-                        return 'nok: autointegration failed'
-                return 'ok'
-            haveResults = True
-            if results.success:
-                self.setIntegrationTime(shutter,spectrometer,results.bestIntegrationTime)
-            else:
-                success=False
-                msg='Autointegration for %s %s failed'%(spectrometer,shutter)
-                self._messages.warning(msg)
-                self.log.warning(msg)
-
     def getIntegrationTime(self,shutter=None,spectrometer=None):
         """get the integration time
 
@@ -457,9 +588,36 @@ class Piccolo(PiccoloInstrument):
             return 'nok','unknown shutter: {}'.format(shutter)
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
-        return self._integrationTimes[shutter][spectrometer]
+        return self._integrationTimes.getTime(shutter,spectrometer)
 
-    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=False,timeout=30.):
+    def getIntegrationTimeSource(self,shutter=None,spectrometer=None):
+        """get the source of integration time
+
+        :param shutter: the shutter name
+        :param spectrometer: the spectrometer name"""
+        if shutter not in self.getShutterList():
+            return 'nok','unknown shutter: {}'.format(shutter)
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._integrationTimes.getSource(shutter,spectrometer)
+    
+    def getMinIntegrationTime(self,spectrometer=None):
+        """get the minimum integration time
+
+        :param spectrometer: the spectrometer name"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._minIntegrationTimes[spectrometer]
+    
+    def getMaxIntegrationTime(self,spectrometer=None):
+        """get the maximum integration time
+
+        :param spectrometer: the spectrometer name"""
+        if spectrometer not in self.getSpectrometerList():
+            return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
+        return self._maxIntegrationTimes[spectrometer]
+    
+    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=-1,timeout=30.):
         """record spectra
 
         :param outDir: name of output directory
@@ -471,14 +629,10 @@ class Piccolo(PiccoloInstrument):
         if self._busy.locked():
             self.log.warning("already recording")
             return 'nok: already recording'
-        if auto:
-            result = self.setIntegrationTimeAuto()
-            if result != 'ok':
-                return result
-            result = self.checkAutoIntegrationResults(block=True,timeout=timeout)
-            if result != 'ok':
-                return result
-        self._tQ.put((self._integrationTimes,outDir,nCycles,delay))
+        if outDir != self._currentRun:
+            self._currentRun = outDir
+            self._messages.addMessage('CR|%s'%outDir)
+        self._tQ.put(('record',outDir,nCycles,delay,auto))
         return 'ok'
 
     def dark(self):
@@ -502,7 +656,33 @@ class Piccolo(PiccoloInstrument):
         :rtype:  (bool, bool)"""
 
 
-        self.checkAutoIntegrationResults()
+        # check if there are any state changes
+        while True:
+            try:
+                sc = self._sQ.get(block=False)
+            except Empty:
+                break
+
+            if sc[0] == 't':
+                shutter,spectrometer,milliseconds,source = sc[1:]
+                self._integrationTimes.setTime(shutter,spectrometer,milliseconds,source)
+            elif sc[0] == 'o':
+                self._extendedStatus.open(sc[1])
+            elif sc[0] == 'c':
+                self._extendedStatus.close(sc[1])
+            elif sc[0] == 'r':
+                if sc[1] == 'start':
+                    self._extendedStatus.start_recording()
+                elif sc[1] == 'stop':
+                    self._extendedStatus.stop_recording()
+            elif sc[0] == 'a':
+                if sc[1] == 'start':
+                    self._extendedStatus.start_autointegration()
+                elif sc[1] == 'stop':
+                    self._extendedStatus.stop_autointegration()
+                else:
+                    shutter,spectrometer,result = sc[1:]
+                    self._extendedStatus.setAutointegrationResult(spectrometer,shutter,result)
 
         self._status.busy = self._busy.locked()
         self._status.paused = self._paused.locked()
@@ -517,7 +697,7 @@ class Piccolo(PiccoloInstrument):
         except:
             self._status.new_message = False
 
-        return self._status.encode()
+        return self._status.encode(),self._extendedStatus.encode()
 
     def info(self):
         """get info
@@ -527,7 +707,7 @@ class Piccolo(PiccoloInstrument):
         self.log.debug("info")
 
         status = self.status()
-        if status[0]:
+        if status[0][0]:
             s = 'busy'
         else:
             s = 'idle'
@@ -616,6 +796,14 @@ class Piccolo(PiccoloInstrument):
             return cmdPipe.stdout.read()
         return ''
 
+    def getRunList(self):
+        """get a list of all runs"""
+        return self._datadir.getRunList()
+    
+    def getCurrentRun(self):
+        """get the name of the current run directory"""
+        return self._currentRun
+    
     def getLocation(self):
         """get current GPS location and metadata"""
         return self._gps.getRecord()

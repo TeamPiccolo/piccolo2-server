@@ -139,6 +139,16 @@ class PiccoloDispatcher(threading.Thread):
                         done = True
                     elif task[0] == 'components':
                         dq.put(('ok',self.getComponentList()))
+                    elif task[0] == 'setQuietTime':
+                        try:
+                            self._scheduler.setQuietTime(start_time=task[2]['start_time'],end_time=task[2]['end_time'])
+                            result = ('ok','set quiet time')
+                        except Exception:
+                            self.log.error('error setting quiet time: {}'.format(sys.exc_info()[1].message))
+                            result = 'nok',sys.exc_info()[1].message
+                        dq.put(result)
+                    elif task[0] == 'getQuietTime':
+                        dq.put(('ok',self._scheduler.getQuietTime()))
                     else:
                         # intercept any schedule instructions
                         for s in ['at_time','interval','end_time']:

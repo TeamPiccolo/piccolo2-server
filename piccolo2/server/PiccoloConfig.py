@@ -26,6 +26,7 @@ import os.path
 import logging
 from configobj import ConfigObj, flatten_errors
 from validate import Validator
+from pprint import pprint as pretty # To pretty-print output when testing.
 
 # the defaults
 defaultCfgStr = """
@@ -41,6 +42,8 @@ defaultCfgStr = """
   [[__many__]]
     detectorSetTemperature = float(default=-10.0)
     fan = boolean(default=True)
+    min_integration_time = float(default=1000.) # minimum integration time in ms
+    max_integration_time = float(default=65535000.) # maximum integration time in ms
 
 [output]
   # overwrite output files when clobber is set to True
@@ -94,4 +97,4 @@ if __name__ == '__main__':
     if len(sys.argv)>1:
         cfg.readCfg(sys.argv[1])
 
-    print cfg.cfg
+    print pretty(cfg.cfg.dict())
