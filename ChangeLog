@@ -1,3 +1,6 @@
+2017-12-21 Magnus Hagdorn
+ * piccolo2/server/PiccoloDispatcher.py: add command to get server version
+
 2017-12-18 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: fix bug
 

@@ -29,6 +29,7 @@ import sys
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloController import PiccoloController
 from PiccoloScheduler import PiccoloScheduler
+from piccolo2.server import __version__ as version
 
 class PiccoloDispatcher(threading.Thread):
     """piccolo dispatcher class
@@ -139,6 +140,8 @@ class PiccoloDispatcher(threading.Thread):
                         done = True
                     elif task[0] == 'components':
                         dq.put(('ok',self.getComponentList()))
+                    elif task[0] == 'getVersion':
+                        dq.put(('ok',version))
                     elif task[0] == 'setQuietTime':
                         try:
                             self._scheduler.setQuietTime(start_time=task[2]['start_time'],end_time=task[2]['end_time'])
