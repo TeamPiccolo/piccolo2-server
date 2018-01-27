@@ -41,6 +41,12 @@ import os.path, json
 import numpy
 import math
 
+# Import the GPIO module to enable wait for trigger.
+import RPi.GPIO as gpio
+gpio.setmode(gpio.BCM)
+gpio.setup(12, gpio.IN)
+gpio.setup(20, gpio.OUT)
+
 class IntegrationTimes(object):
     def __init__(self,shutters,spectrometers,callback=None):
         self._shutters = shutters
@@ -78,7 +84,7 @@ class IntegrationTimes(object):
             self._integrationTimeSource[shutter][spectrometer] = source
             if self._callback is not None:
                 self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),source)
-            
+
     def getTime(self,shutter,spectrometer):
         return self._integrationTime[shutter][spectrometer]
 
@@ -90,7 +96,7 @@ class IntegrationTimes(object):
             for shutter in self.shutters:
                 for spectrometer in self.spectrometers:
                     self._callback(shutter,spectrometer,self.getTime(shutter,spectrometer),self.getSource(shutter,spectrometer))
-    
+
 class PiccoloThread(PiccoloWorkerThread):
     """worker thread handling a number of shutters and spectrometers"""
 
@@ -124,7 +130,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
     def _itChanged(self,shutter,spectrometer,t,s):
         self._stateChanges.put(('t',shutter,spectrometer,t,s))
-        
+
     def setIntegrationTime(self,shutter,spectrometer,milliseconds,roundup=True,source=0):
         v = float(milliseconds)
         if roundup:
@@ -138,7 +144,7 @@ class PiccoloThread(PiccoloWorkerThread):
         self._integrationTimes.setTime(shutter,spectrometer,v,source)
     def getAllIntegrationTimes(self):
         self._integrationTimes.allChanged()
-        
+
     def _wait(self):
         time.sleep(0.2)
 
@@ -188,7 +194,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 return
             return cmd
         elif cmd[0] in ['setMinTime','setMaxTime']:
-            return cmd    
+            return cmd
         else:
             if self.busy.locked():
                 self.log.warn('already recording data')
@@ -200,7 +206,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
     def setMaxIntegrationTime(self,spectrometer,milliseconds):
         self._spectrometers[spectrometer].setMaxIntegrationTime(milliseconds)
-        
+
     def getCounter(self,key):
         if key not in self._outCounter:
             self._outCounter[key] = self._datadir.getNextCounter(key)
@@ -300,12 +306,24 @@ class PiccoloThread(PiccoloWorkerThread):
             self.log.info("start recording {}".format(nCycles))
             self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
+            # trigger-test-1 branch: wait for the trigger signal before starting.
+            if gpio.input(12):
+                self.log.warning("Operating in untriggered mode because the trigger signal is bypassed.")
+            else:
+                self.log.info("Waiting for a trigger pulse on GPIO12.")
+                while not gpio.input(12):
+                    pass
+                self.log.info("Detected the start of the trigger pulse. Waiting for the end of the trigger pulse...")
+                while gpio.input(12):
+                    pass
+                self.log.info("Detected the end of the trigger pulse. Starting acquisition of a batch.")
+
             # run initial autointegration if requested
             if auto == 0:
                 self.log.info("start autointegration")
                 self.autoIntegrate()
                 self.log.info("finished autointegration")
-            
+
             n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
             # Work out the output filename.
             batchNr = self.getCounter(outDir)
@@ -336,7 +354,7 @@ class PiccoloThread(PiccoloWorkerThread):
                     self.autoIntegrate()
                     self.log.info("finished autointegration")
 
-                
+
                 # order of dark/light measurements
                 # * the first sequence of a batch or when a dark measurement is required is dark
                 # * then do a light measurement
@@ -346,7 +364,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 # so at most two measurements are taken (one dark and one light)
                 measurements = []
                 if n==1 or self._needDark:
-                    measurements.append(True) 
+                    measurements.append(True)
                 measurements.append(False)
                 if n==nCycles:
                     if not measurements[0]:
@@ -459,7 +477,7 @@ class Piccolo(PiccoloInstrument):
 
         # the extended status
         self._extendedStatus = PiccoloExtendedStatus(spectrometers.keys(),shutters.keys())
-            
+
         # integration times
         self._integrationTimes = IntegrationTimes(self.getShutterList(),self.getSpectrometerList(),callback=self._itChanged)
         self._minIntegrationTimes = {}
@@ -487,7 +505,7 @@ class Piccolo(PiccoloInstrument):
 
     def _itChanged(self,shutter,spectrometer,t,s):
         self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
-        
+
     def getListenerID(self):
         """get a listener ID for use with messages"""
         return self._messages.newListener()
@@ -544,7 +562,7 @@ class Piccolo(PiccoloInstrument):
         self._minIntegrationTimes[spectrometer] = milliseconds
         self._worker.setMinIntegrationTime(spectrometer,milliseconds)
         return 'ok'
-    
+
     def setMaxIntegrationTime(self,spectrometer=None,milliseconds=1000.):
         """set the maximum integration time"""
         if spectrometer not in self.getSpectrometerList():
@@ -553,7 +571,7 @@ class Piccolo(PiccoloInstrument):
         self._maxIntegrationTimes[spectrometer] = milliseconds
         self._worker.setMaxIntegrationTime(spectrometer,milliseconds)
         return 'ok'
-    
+
     def setIntegrationTimeManual(self, shutter=None, spectrometer=None, milliseconds=1000.):
         """Set the integration time manually.
 
@@ -600,7 +618,7 @@ class Piccolo(PiccoloInstrument):
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._integrationTimes.getSource(shutter,spectrometer)
-    
+
     def getMinIntegrationTime(self,spectrometer=None):
         """get the minimum integration time
 
@@ -608,7 +626,7 @@ class Piccolo(PiccoloInstrument):
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._minIntegrationTimes[spectrometer]
-    
+
     def getMaxIntegrationTime(self,spectrometer=None):
         """get the maximum integration time
 
@@ -616,7 +634,7 @@ class Piccolo(PiccoloInstrument):
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._maxIntegrationTimes[spectrometer]
-    
+
     def record(self,outDir='spectra',delay=0.,nCycles=1,auto=-1,timeout=30.):
         """record spectra
 
@@ -799,11 +817,11 @@ class Piccolo(PiccoloInstrument):
     def getRunList(self):
         """get a list of all runs"""
         return self._datadir.getRunList()
-    
+
     def getCurrentRun(self):
         """get the name of the current run directory"""
         return self._currentRun
-    
+
     def getLocation(self):
         """get current GPS location and metadata"""
         return self._gps.getRecord()
