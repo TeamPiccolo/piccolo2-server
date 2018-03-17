@@ -132,6 +132,14 @@ def piccolo_server(serverCfg):
             spectrometers[sname].maxIntegrationTime = piccoloCfg.cfg['spectrometers'][sname[2:]]['max_integration_time']
         pd.registerComponent(spectrometers[sname])
 
+    # Look for calibration data related to each of the connected spectrometers.
+    for sname in spectrometers:
+        serial = sname[2:]
+        if serial in piccoloCfg.cfg['calibrations']:
+            log.info('Found a calibration section for the spectrometer {}'.format(serial))
+        else:
+            log.warning('No calibration section for the spectrometer {}'.format(serial))
+
     # initialize the gps
     gps = piccolo.PiccoloGPS()
     # initialise the piccolo component
