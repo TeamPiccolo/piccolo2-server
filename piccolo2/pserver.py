@@ -137,9 +137,9 @@ def piccolo_server(serverCfg):
         serial = sname[2:]
         if serial in piccoloCfg.cfg['calibrations']:
             log.info('Reading calibration of spectrometer {} from instrument configuration file.'.format(serial))
-            for c in piccoloCfg.cfg['channels']:
-                if c in piccoloCfg.cfg['calibrations'][serial]:
-                    wavcal = piccoloCfg.cfg['calibrations'][serial]['wavelengthCalibrationCoefficientsPiccolo']
+            for channel in piccoloCfg.cfg['channels']:
+                if channel in piccoloCfg.cfg['calibrations'][serial]:
+                    wavcal = piccoloCfg.cfg['calibrations'][serial][channel]['wavelengthCalibrationCoefficientsPiccolo']
                     log.info('Spectrometer {} wavelength calibration coefficients for channel {} read from instrument configuration file: {}'.format(serial, c, wavcal))
                 else:
                     log.error('Spectrometer {} is missing wavelength calibration data for channel {} in the instrument configuration file.'.format(serial, c))
