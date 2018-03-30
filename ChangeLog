@@ -1,3 +1,7 @@
+2018-03-30 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add functionality to set record parameters
+   separately; move autointegration repeat to new style parameter
+
 2017-12-21 Magnus Hagdorn
  * piccolo2/server/PiccoloDispatcher.py: add command to get server version
 

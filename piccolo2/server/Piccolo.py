@@ -107,6 +107,10 @@ class PiccoloThread(PiccoloWorkerThread):
         self._outCounter = {}
         self._integrationTimes = IntegrationTimes(self._shutters.keys(),self._spectrometers.keys(),callback=self._itChanged)
         self._needDark = False
+        self._auto = -1
+        self._currentRun = 'spectra'
+        self._nCycles = 1
+        self._delay = 0
         self._stateChanges = stateChanges
         self._file_incremented = file_incremented
 
@@ -138,6 +142,51 @@ class PiccoloThread(PiccoloWorkerThread):
         self._integrationTimes.setTime(shutter,spectrometer,v,source)
     def getAllIntegrationTimes(self):
         self._integrationTimes.allChanged()
+
+    def getAuto(self):
+        self._stateChanges.put(('ai',self._auto))        
+    def setAuto(self,auto):
+        try:
+            a = int(auto)
+        except:
+            logging.error('cannot set auto to %s'%str(auto))
+            return
+        if a != self._auto:
+            self._auto = a
+            self.getAuto()
+
+    def getCurrentRun(self):
+        self._stateChanges.put(('cr',self._currentRun))
+    def setCurrentRun(self,cr):
+        if cr != self._currentRun:
+            self._currentRun = cr
+            self.currentRun()
+
+    def getNCycles(self):
+        self._stateChanges.put(('nc',self._nCycles))
+    def setNCycles(self,nCycles):
+        try:
+            n = int(nCycles)
+            assert n>=0
+        except:
+            logging.error('cannot set nCycles to %s'%str(nCycles))
+            return
+        if n != self._nCycles:
+            self._nCycles = n
+            self.getNCycles()
+
+    def getDelay(self):
+        self._stateChanges.put(('d',self._delay))
+    def setDelay(self,delay):
+        try:
+            d = float(delay)
+            assert d>=0.
+        except:
+            logging.error('cannot set delay to %s'%str(delay))
+            return
+        if d != self._delay:
+            self._delay = d
+            self.getDelay()
         
     def _wait(self):
         time.sleep(0.2)
@@ -180,14 +229,24 @@ class PiccoloThread(PiccoloWorkerThread):
                         return
                     else:
                         self.log.warn('acquisition paused')
-        elif cmd in ['dark','getTimes']:
+        elif cmd =='dark':
             return cmd
+        elif cmd == 'getTimes':
+            self.getAllIntegrationTimes()
+        elif cmd == 'getCurrentRun':
+            self.getCurrentRun()
+        elif cmd == 'getNCycles':
+            self.getNCycles()
+        elif cmd == 'getDelay':
+            self.getDelay()
+        elif cmd == 'getAuto':
+            self.getAuto()
         elif cmd == 'auto':
             if self.busy.locked():
                 self.log.warn('already recording data')
                 return
             return cmd
-        elif cmd[0] in ['setMinTime','setMaxTime']:
+        elif cmd[0] in ['setMinTime','setMaxTime','setCurrentRun','setNCycles','setDelay','setAuto']:
             return cmd    
         else:
             if self.busy.locked():
@@ -277,9 +336,6 @@ class PiccoloThread(PiccoloWorkerThread):
                 self.busy.release()
                 self.log.info("finished autointegration")
                 continue
-            elif task == 'getTimes':
-                self.getAllIntegrationTimes()
-                continue
             elif task[0] ==  'setMinTime':
                 self.setMinIntegrationTime(task[1],task[2])
                 continue
@@ -289,9 +345,21 @@ class PiccoloThread(PiccoloWorkerThread):
             elif task[0] == 'setTime':
                 self.setIntegrationTime(task[1],task[2],task[3],source=0)
                 continue
+            elif task[0] == 'setCurrentRun':
+                self.setCurrentRun(task[1])
+                continue
+            elif task[0] == 'setNCycles':
+                self.setNCycles(task[1])
+                continue
+            elif task[0] == 'setDelay':
+                self.setDelay(task[1])
+                continue
+            elif task[0] == 'setAuto':
+                self.setAuto(task[1])
+                continue
             elif task[0] == 'record':
                 # get task
-                (outDir,nCycles,delay,auto) = task[1:]
+                (outDir,nCycles,delay) = task[1:]
             else:
                 # nothing interesting, get the next command
                 continue
@@ -301,7 +369,7 @@ class PiccoloThread(PiccoloWorkerThread):
             self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
             # run initial autointegration if requested
-            if auto == 0:
+            if self._auto == 0:
                 self.log.info("start autointegration")
                 self.autoIntegrate()
                 self.log.info("finished autointegration")
@@ -331,7 +399,7 @@ class PiccoloThread(PiccoloWorkerThread):
 
                 self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
 
-                if auto>0 and (n-1)%auto==0:
+                if self._auto>0 and (n-1)%self._auto==0:
                     self.log.info("start autointegration")
                     self.autoIntegrate()
                     self.log.info("finished autointegration")
@@ -451,12 +519,15 @@ class Piccolo(PiccoloInstrument):
 
         self._messages = PiccoloMessages()
 
-        # the current run
+        # the record parameters
         try:
             self._currentRun = self._datadir.getRunList()[-1]
         except:
             self._currentRun = 'spectra'
-
+        self._auto = -1
+        self._nCycles = 1
+        self._delay = 0
+            
         # the extended status
         self._extendedStatus = PiccoloExtendedStatus(spectrometers.keys(),shutters.keys())
             
@@ -487,6 +558,13 @@ class Piccolo(PiccoloInstrument):
 
     def _itChanged(self,shutter,spectrometer,t,s):
         self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
+
+    def _paramChanged(self,param,value,key=None):
+        p = '_'+param
+        if getattr(self,p) != value:
+            setattr(self,p,value)
+            if key is not None:
+                self._messages.addMessage('{}|{}'.format(key,value))
         
     def getListenerID(self):
         """get a listener ID for use with messages"""
@@ -510,7 +588,7 @@ class Piccolo(PiccoloInstrument):
     def getShutterList(self):
         """return list of shutters"""
         return self._shutters
-
+    
     def setIntegrationTime(self,shutter=None,spectrometer=None,milliseconds=1000.):
         """Set the integration time manually.
 
@@ -616,14 +694,25 @@ class Piccolo(PiccoloInstrument):
         if spectrometer not in self.getSpectrometerList():
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._maxIntegrationTimes[spectrometer]
-    
-    def record(self,outDir='spectra',delay=0.,nCycles=1,auto=-1,timeout=30.):
+
+    def setAuto(self,auto):
+        """set autointegration
+
+        :param auto: integer, can be -1 for never; 0 once at the beginning; otherwise every nth measurement
+        """
+        self._tQ.put(('setAuto',auto))
+        return 'ok'
+    def getAuto(self):
+        """get the current autointegration value"""
+        self.status()
+        return self._auto
+        
+    def record(self,outDir='spectra',delay=0.,nCycles=1,timeout=30.):
         """record spectra
 
         :param outDir: name of output directory
         :param delay: delay in seconds between each record
         :param nCycles: the number of recording cycles or 'Inf'
-        :param auto: when set to True determine best integration time before recording spectra
         :param timeout: wait at most timeoutseconds for autointegration to have finished"""
 
         if self._busy.locked():
@@ -632,7 +721,7 @@ class Piccolo(PiccoloInstrument):
         if outDir != self._currentRun:
             self._currentRun = outDir
             self._messages.addMessage('CR|%s'%outDir)
-        self._tQ.put(('record',outDir,nCycles,delay,auto))
+        self._tQ.put(('record',outDir,nCycles,delay))
         return 'ok'
 
     def dark(self):
@@ -670,6 +759,14 @@ class Piccolo(PiccoloInstrument):
                 self._extendedStatus.open(sc[1])
             elif sc[0] == 'c':
                 self._extendedStatus.close(sc[1])
+            elif sc[0] == 'ai':
+                self._paramChanged('auto',sc[1],'AI')
+            elif sc[0] == 'cr':
+                self._paramChanged('currentRun',sc[1],'CR')
+            elif sc[0] == 'nc':
+                self._paramChanged('nCycles',sc[1],'NC')
+            elif sc[0] == 'd':
+                self._paramChanged('delay',sc[1],'D')
             elif sc[0] == 'r':
                 if sc[1] == 'start':
                     self._extendedStatus.start_recording()
