@@ -135,7 +135,7 @@ def piccolo_server(serverCfg):
     # Look for calibration data related to each of the connected spectrometers.
     for sname in spectrometers:
         serial = sname[2:]
-        if serial in piccoloCfg.cfg['calibrations']:
+        if 'calibrations' in piccoloCfg.cfg and serial in piccoloCfg.cfg['calibrations']:
             log.info('Reading calibration of spectrometer {} from instrument configuration file.'.format(serial))
             for channel in piccoloCfg.cfg['channels']:
                 if channel in piccoloCfg.cfg['calibrations'][serial]:

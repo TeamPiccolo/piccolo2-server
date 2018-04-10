@@ -1,3 +1,7 @@
+2018-04-10 Magnus Hagdorn
+ * M piccolo2/pserver.py: avoid problem with missing config option
+ * piccolo2/server/Piccolo.py: set delay and number of cycles separately
+
 2018-03-30 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: add functionality to set record parameters
    separately; move autointegration repeat to new style parameter

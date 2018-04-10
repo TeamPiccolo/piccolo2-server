@@ -241,13 +241,11 @@ class PiccoloThread(PiccoloWorkerThread):
             self.getDelay()
         elif cmd == 'getAuto':
             self.getAuto()
-        elif cmd == 'auto':
+        elif cmd in ['auto','setMinTime','setMaxTime','setCurrentRun','setNCycles','setDelay','setAuto']:
             if self.busy.locked():
                 self.log.warn('already recording data')
                 return
             return cmd
-        elif cmd[0] in ['setMinTime','setMaxTime','setCurrentRun','setNCycles','setDelay','setAuto']:
-            return cmd    
         else:
             if self.busy.locked():
                 self.log.warn('already recording data')
@@ -359,13 +357,13 @@ class PiccoloThread(PiccoloWorkerThread):
                 continue
             elif task[0] == 'record':
                 # get task
-                (outDir,nCycles,delay) = task[1:]
+                (outDir,) = task[1:]
             else:
                 # nothing interesting, get the next command
                 continue
 
             # start recording
-            self.log.info("start recording {}".format(nCycles))
+            self.log.info("start recording {}".format(self._nCycles))
             self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
             # run initial autointegration if requested
@@ -383,11 +381,11 @@ class PiccoloThread(PiccoloWorkerThread):
                 spectra.prefix = prefix
                 cmd = None
                 n = n+1
-                if nCycles!='Inf' and n > nCycles:
+                if self._nCycles!='Inf' and n > self._nCycles:
                     break
-                if n>1 and delay>0:
-                    self.log.info('waiting for {} seconds'.format(delay))
-                    time.sleep(delay)
+                if n>1 and self._delay>0:
+                    self.log.info('waiting for {} seconds'.format(self._delay))
+                    time.sleep(self._delay)
                     # check for abort/shutdown
                     cmd = self._getCommands(block=False)
                     if cmd=='abort':
@@ -397,7 +395,7 @@ class PiccoloThread(PiccoloWorkerThread):
                     elif cmd=='dark':
                         self._needDark = True
 
-                self.log.info('Record cycle {0}/{1}'.format(n,nCycles))
+                self.log.info('Record cycle {0}/{1}'.format(n,self._nCycles))
 
                 if self._auto>0 and (n-1)%self._auto==0:
                     self.log.info("start autointegration")
@@ -416,7 +414,7 @@ class PiccoloThread(PiccoloWorkerThread):
                 if n==1 or self._needDark:
                     measurements.append(True) 
                 measurements.append(False)
-                if n==nCycles:
+                if n==self._nCycles:
                     if not measurements[0]:
                         measurements.append(True)
                     else:
@@ -442,7 +440,7 @@ class PiccoloThread(PiccoloWorkerThread):
                     return
 
                 self.results.put(spectra)
-                self.log.info('finished acquisition {0}/{1}'.format(n,nCycles))
+                self.log.info('finished acquisition {0}/{1}'.format(n,self._nCycles))
 
             self.busy.release()
 
@@ -695,24 +693,55 @@ class Piccolo(PiccoloInstrument):
             return 'nok', 'unknown spectrometer: {}'.format(spectrometer)
         return self._maxIntegrationTimes[spectrometer]
 
-    def setAuto(self,auto):
+    def setAuto(self,auto=-1):
         """set autointegration
 
         :param auto: integer, can be -1 for never; 0 once at the beginning; otherwise every nth measurement
         """
+        if self._busy.locked():
+            self.log.warning("already recording")
+            return 'nok: already recording'
         self._tQ.put(('setAuto',auto))
         return 'ok'
     def getAuto(self):
         """get the current autointegration value"""
         self.status()
         return self._auto
-        
-    def record(self,outDir='spectra',delay=0.,nCycles=1,timeout=30.):
+
+    def setNCycles(self,ncycles=1):
+        """set the number of measurements of a run
+
+        :param ncycles: the number of measurements
+        """
+        if self._busy.locked():
+            self.log.warning("already recording")
+            return 'nok: already recording'
+        self._tQ.put(('setNCycles',ncycles))
+        return 'ok'
+    def getNCycles(self):
+        """get the current number of measurements per run"""
+        self.status()
+        return self._nCycles
+
+    def setDelay(self,delay=0.):
+        """set the delay in seconds between each record
+
+        :param delay: delay in seconds between each record
+        """
+        if self._busy.locked():
+            self.log.warning("already recording")
+            return 'nok: already recording'
+        self._tQ.put(('setDelay',delay))
+        return 'ok'
+    def getDelay(self):
+        """get the current delay between each record"""
+        self.status()
+        return self._delay
+    
+    def record(self,outDir='spectra',timeout=30.):
         """record spectra
 
         :param outDir: name of output directory
-        :param delay: delay in seconds between each record
-        :param nCycles: the number of recording cycles or 'Inf'
         :param timeout: wait at most timeoutseconds for autointegration to have finished"""
 
         if self._busy.locked():
@@ -721,7 +750,7 @@ class Piccolo(PiccoloInstrument):
         if outDir != self._currentRun:
             self._currentRun = outDir
             self._messages.addMessage('CR|%s'%outDir)
-        self._tQ.put(('record',outDir,nCycles,delay))
+        self._tQ.put(('record',outDir))
         return 'ok'
 
     def dark(self):
