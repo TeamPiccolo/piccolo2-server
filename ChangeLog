@@ -1,4 +1,8 @@
 2018-04-11 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add parameters again to record method and use
+   the setters to set params when they are not None
+
+2018-04-11 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: use new API to set current run name
 
 2018-04-10 Magnus Hagdorn

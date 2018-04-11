@@ -738,13 +738,34 @@ class Piccolo(PiccoloInstrument):
         self.status()
         return self._delay
     
-    def record(self,timeout=30.):
+    def record(self,currentRun=None,delay=None,nCycles=None,auto=None,timeout=30.):
         """record spectra
-
+        
+        :param currentRun: name of the current run
+        :param delay: delay in seconds between each batch
+        :param nCycles: the number of recording cycles
+        :param auto: when set to True determine best integration time before each batch
         :param timeout: wait at most timeoutseconds for autointegration to have finished"""
 
+        if currentRun is not None:
+            r = self.setCurrentRun(currentRun)
+            if r!='ok':
+                return r
+        if delay is not None:
+            r = self.setDelay(delay)
+            if r!='ok':
+                return r
+        if nCycles is not None:
+            r = self.setNCycles(nCycles)
+            if r!='ok':
+                return r
+        if auto is not None:
+            r = self.setAuto(auto)
+            if r!='ok':
+                return r
         if self._busy.locked():
             self.log.warning("already recording")
+            return 'nok: not recording'
         self._tQ.put(('record',))
         return 'ok'
 
