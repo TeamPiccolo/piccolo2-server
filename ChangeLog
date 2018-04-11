@@ -1,4 +1,8 @@
 2018-04-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloScheduler.py: only ignore schedule if both start and
+   end time are in the past
+
+2018-04-11 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: add parameters again to record method and use
    the setters to set params when they are not None
 
