@@ -1,4 +1,4 @@
-2018-04-10 Magnus Hagdorn
+2018-04-11 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: use new API to set current run name
 
 2018-04-10 Magnus Hagdorn
