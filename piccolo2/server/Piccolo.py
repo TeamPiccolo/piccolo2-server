@@ -160,7 +160,7 @@ class PiccoloThread(PiccoloWorkerThread):
     def setCurrentRun(self,cr):
         if cr != self._currentRun:
             self._currentRun = cr
-            self.currentRun()
+            self.getCurrentRun()
 
     def getNCycles(self):
         self._stateChanges.put(('nc',self._nCycles))
@@ -357,92 +357,92 @@ class PiccoloThread(PiccoloWorkerThread):
                 continue
             elif task[0] == 'record':
                 # get task
-                (outDir,) = task[1:]
-            else:
-                # nothing interesting, get the next command
-                continue
 
-            # start recording
-            self.log.info("start recording {}".format(self._nCycles))
-            self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
+                # start recording
+                self.log.info("start recording {}".format(self._nCycles))
+                self.busy.acquire() # Lock the Piccolo thread, to prevent recording whilst already recording.
 
-            # run initial autointegration if requested
-            if self._auto == 0:
-                self.log.info("start autointegration")
-                self.autoIntegrate()
-                self.log.info("finished autointegration")
-            
-            n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
-            # Work out the output filename.
-            batchNr = self.getCounter(outDir)
-            prefix = os.path.join(outDir,'b{0:06d}_s'.format(batchNr))
-            while True:
-                spectra = PiccoloSpectraList(seqNr=n)
-                spectra.prefix = prefix
-                cmd = None
-                n = n+1
-                if self._nCycles!='Inf' and n > self._nCycles:
-                    break
-                if n>1 and self._delay>0:
-                    self.log.info('waiting for {} seconds'.format(self._delay))
-                    time.sleep(self._delay)
-                    # check for abort/shutdown
-                    cmd = self._getCommands(block=False)
-                    if cmd=='abort':
-                        break
-                    elif cmd=='shutdown':
-                        return
-                    elif cmd=='dark':
-                        self._needDark = True
-
-                self.log.info('Record cycle {0}/{1}'.format(n,self._nCycles))
-
-                if self._auto>0 and (n-1)%self._auto==0:
+                # run initial autointegration if requested
+                if self._auto == 0:
                     self.log.info("start autointegration")
                     self.autoIntegrate()
                     self.log.info("finished autointegration")
 
-                
-                # order of dark/light measurements
-                # * the first sequence of a batch or when a dark measurement is required is dark
-                # * then do a light measurement
-                # * if it is the last sequence in a batch record a dark measurement
-                # ** but if the first measurement is already a dark one swap measurements
-                #
-                # so at most two measurements are taken (one dark and one light)
-                measurements = []
-                if n==1 or self._needDark:
-                    measurements.append(True) 
-                measurements.append(False)
-                if n==self._nCycles:
-                    if not measurements[0]:
-                        measurements.append(True)
-                    else:
-                        measurements.reverse()
-
-                # loop over measurements
-                for dark in measurements:
-                    for shutter in self._shutters:
-                        for s in self.record(shutter,dark):
-                            # Insert the batch and sequence numbers into the metadata.
-                            s.update({'Batch': batchNr,'Run':outDir})
-                            spectra.append(s)
+                n = 0 # n is the sequence number. The first sequence is 0, the last is nCycles-1.
+                # Work out the output filename.
+                batchNr = self.getCounter(self._currentRun)
+                prefix = os.path.join(self._currentRun,'b{0:06d}_s'.format(batchNr))
+                while True:
+                    spectra = PiccoloSpectraList(seqNr=n)
+                    spectra.prefix = prefix
+                    cmd = None
+                    n = n+1
+                    if self._nCycles!='Inf' and n > self._nCycles:
+                        break
+                    if n>1 and self._delay>0:
+                        self.log.info('waiting for {} seconds'.format(self._delay))
+                        time.sleep(self._delay)
                         # check for abort/shutdown
                         cmd = self._getCommands(block=False)
-                    if dark:
-                        self._needDark = False
-                    if cmd in ['abort','shutdown']:
+                        if cmd=='abort':
+                            break
+                        elif cmd=='shutdown':
+                            return
+                        elif cmd=='dark':
+                            self._needDark = True
+
+                    self.log.info('Record cycle {0}/{1}'.format(n,self._nCycles))
+
+                    if self._auto>0 and (n-1)%self._auto==0:
+                        self.log.info("start autointegration")
+                        self.autoIntegrate()
+                        self.log.info("finished autointegration")
+
+
+                    # order of dark/light measurements
+                    # * the first sequence of a batch or when a dark measurement is required is dark
+                    # * then do a light measurement
+                    # * if it is the last sequence in a batch record a dark measurement
+                    # ** but if the first measurement is already a dark one swap measurements
+                    #
+                    # so at most two measurements are taken (one dark and one light)
+                    measurements = []
+                    if n==1 or self._needDark:
+                        measurements.append(True) 
+                    measurements.append(False)
+                    if n==self._nCycles:
+                        if not measurements[0]:
+                            measurements.append(True)
+                        else:
+                            measurements.reverse()
+
+                    # loop over measurements
+                    for dark in measurements:
+                        for shutter in self._shutters:
+                            for s in self.record(shutter,dark):
+                                # Insert the batch and sequence numbers into the metadata.
+                                s.update({'Batch': batchNr,'Run':self._currentRun})
+                                spectra.append(s)
+                            # check for abort/shutdown
+                            cmd = self._getCommands(block=False)
+                        if dark:
+                            self._needDark = False
+                        if cmd in ['abort','shutdown']:
+                            break
+
+                    if cmd=='abort':
                         break
+                    elif cmd=='shutdown':
+                        return
 
-                if cmd=='abort':
-                    break
-                elif cmd=='shutdown':
-                    return
+                    self.results.put(spectra)
+                    self.log.info('finished acquisition {0}/{1}'.format(n,self._nCycles))
 
-                self.results.put(spectra)
-                self.log.info('finished acquisition {0}/{1}'.format(n,self._nCycles))
-
-            self.busy.release()
+                self.busy.release()
+                continue
+            else:
+                # unknown command
+                self.log.warn("unknown command %s"%str(task))
 
 class PiccoloOutput(threading.Thread):
     """piccolo writer thread"""
@@ -738,19 +738,14 @@ class Piccolo(PiccoloInstrument):
         self.status()
         return self._delay
     
-    def record(self,outDir='spectra',timeout=30.):
+    def record(self,timeout=30.):
         """record spectra
 
-        :param outDir: name of output directory
         :param timeout: wait at most timeoutseconds for autointegration to have finished"""
 
         if self._busy.locked():
             self.log.warning("already recording")
-            return 'nok: already recording'
-        if outDir != self._currentRun:
-            self._currentRun = outDir
-            self._messages.addMessage('CR|%s'%outDir)
-        self._tQ.put(('record',outDir))
+        self._tQ.put(('record',))
         return 'ok'
 
     def dark(self):
@@ -925,9 +920,20 @@ class Piccolo(PiccoloInstrument):
     def getRunList(self):
         """get a list of all runs"""
         return self._datadir.getRunList()
+
+    def setCurrentRun(self,cr='spectra'):
+        """set the name of the current run directory
+
+        :param cr: the name of the current run directory"""
+        if self._busy.locked():
+            self.log.warning("already recording")
+            return 'nok: already recording'
+        self._tQ.put(('setCurrentRun',cr))
+        return 'ok'
     
     def getCurrentRun(self):
         """get the name of the current run directory"""
+        self.status()
         return self._currentRun
     
     def getLocation(self):
