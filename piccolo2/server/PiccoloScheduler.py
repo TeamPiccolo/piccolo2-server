@@ -71,10 +71,11 @@ class PiccoloScheduledJob(object):
         self._suspended = False
 
         # check that scheduled time is not in the past
-        if self._at < datetime.datetime.now():
+        now = datetime.datetime.now()
+        if self._at < now and (self._end is None or self._end < now):
             self.log.warning("scheduled job is in the past")
             self._has_run = True
-        if self._end!= None and self._at >= self._end:
+        if self._end is not None and self._at >= self._end:
             self.log.warning("job is scheduled for execution after the end time")
             self._has_run = True
 

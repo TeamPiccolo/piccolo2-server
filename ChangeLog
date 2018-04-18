@@ -1,3 +1,22 @@
+2018-04-11 Magnus Hagdorn
+ * piccolo2/server/PiccoloScheduler.py: only ignore schedule if both start and
+   end time are in the past
+
+2018-04-11 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add parameters again to record method and use
+   the setters to set params when they are not None
+
+2018-04-11 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: use new API to set current run name
+
+2018-04-10 Magnus Hagdorn
+ * piccolo2/pserver.py: avoid problem with missing config option
+ * piccolo2/server/Piccolo.py: set delay and number of cycles separately
+
+2018-03-30 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add functionality to set record parameters
+   separately; move autointegration repeat to new style parameter
+
 2017-12-21 Magnus Hagdorn
  * piccolo2/server/PiccoloDispatcher.py: add command to get server version
 
