@@ -879,12 +879,18 @@ class Piccolo(PiccoloInstrument):
 
         info = {'hostname':  socket.gethostname(),
                 'cpu_percent': psutil.cpu_percent(),
+                'memory_percent': psutil.virtual_memory().percent,
                 'status': s}
         if self._datadir.isMounted:
             info['datadir'] = self._datadir.datadir
         else:
             info['datadir'] = 'not mounted'
         return info
+
+    def memory(self):
+        return psutil.virtual_memory().percent
+    def cpu(self):
+        return psutil.cpu_percent()
 
     def getSpectraList(self,outDir='spectra',haveNFiles=0):
         return self._datadir.getFileList(outDir,haveNFiles=haveNFiles)

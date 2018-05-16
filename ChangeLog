@@ -1,3 +1,6 @@
+2018-05-16 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: add methods to query percentage memory/CPU used
+
 2018-05-09 Magnus Hagdorn
  * piccolo2/server/PiccoloMessages.py: use sqlite DB to manage message queue
 
