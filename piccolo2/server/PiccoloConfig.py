@@ -45,6 +45,11 @@ defaultCfgStr = """
     min_integration_time = float(default=1000.) # minimum integration time in ms
     max_integration_time = float(default=65535000.) # maximum integration time in ms
 
+[calibrations]
+  [[__many__]]
+     [[[__many__]]]
+        wavelengthCalibrationCoefficientsPiccolo = float_list()
+
 [output]
   # overwrite output files when clobber is set to True
   clobber = boolean(default=False)
@@ -54,7 +59,7 @@ defaultCfgStr = """
 """
 
 # populate the default  config object which is used as a validator
-piccoloDefaults = ConfigObj(defaultCfgStr.split('\n'))
+piccoloDefaults = ConfigObj(defaultCfgStr.split('\n'),list_values=False,_inspec=True)
 validator = Validator()
 
 class PiccoloConfig(object):
@@ -89,6 +94,15 @@ class PiccoloConfig(object):
     def cfg(self):
         return self._cfg
 
+    def getCalibration(self,spectrometer):
+        calibration = {}
+        for c in self.cfg['channels']:
+            if spectrometer in self.cfg['calibrations'] and c in self.cfg['calibrations'][spectrometer]:
+                calibration[c] = self.cfg['calibrations'][spectrometer][c]['wavelengthCalibrationCoefficientsPiccolo']
+            else:
+                calibration[c] = None
+        return calibration
+                
 if __name__ == '__main__':
     import sys
 
@@ -98,3 +112,6 @@ if __name__ == '__main__':
         cfg.readCfg(sys.argv[1])
 
     print pretty(cfg.cfg.dict())
+
+    for s in cfg.cfg['calibrations']:
+        print cfg.getCalibration(s)

@@ -86,7 +86,7 @@ def piccolo_server(serverCfg):
         for s in piccolo_spectrometers.getConnectedSpectrometers():
             #strip out all non-alphanumeric characters
             sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
-            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
+            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s,calibration=piccoloCfg.getCalibration(sname[2:]))
     if len(spectrometers) == 0:
         for sn in piccoloCfg.cfg['spectrometers']:
             sname = 'S_'+sn
@@ -94,7 +94,7 @@ def piccolo_server(serverCfg):
                 s = piccolo_spectrometers.SimulatedOceanOpticsSpectrometer(sn)
             else:
                 s = None
-            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s)
+            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s,calibration=piccoloCfg.getCalibration(sname[2:]))
     # Set the spectrometer temperatures (for spectrometers that have a settable detector temperature).
     hasTEC = dict() # The spectrometer has a TEC and its temperature can be adjusted.
     temperaturesToSet = dict()

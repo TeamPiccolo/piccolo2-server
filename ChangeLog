@@ -1,3 +1,11 @@
+2018-05-28 Magnus Hagdorn
+ * piccolo2/pserver.py: attach wavenmumber calibration coefficients
+ * piccolo2/server/Piccolo.py: remove calibration hack
+ * piccolo2/server/PiccoloConfig.py: add method to get wavenumber calibration
+   coefficients
+ * piccolo2/server/PiccoloSpectrometer.py: store wavenumber calibration 
+   coefficients in spectra when available
+
 2018-05-16 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: add methods to query percentage memory/CPU used
 

@@ -366,7 +366,7 @@ class SpectrometerThread(PiccoloWorkerThread):
 
     LOGNAME = 'spectrometer'
 
-    def __init__(self, name, spectrometer, busy, tasks, results,integration_times):
+    def __init__(self, name, spectrometer, calibration, busy, tasks, results,integration_times):
         """Initialize the worker thread.
 
         Note: calling __init__ does not start the thread, a subsequent call to
@@ -376,6 +376,7 @@ class SpectrometerThread(PiccoloWorkerThread):
         :type name: str
         :param spectrometer: A PiccoloSpectrometer object
         :type spectrometer: PiccoloSpectrometer
+        :param calibration: dictionary containing wavenumber calibration coefficients for each channel
         :param busy: a "lock" which prevents using the spectrometer when it is busy
         :type busy: thread.lock
         :param tasks: a queue into which tasks will be put
@@ -388,6 +389,7 @@ class SpectrometerThread(PiccoloWorkerThread):
         PiccoloWorkerThread.__init__(self, name, busy, tasks, results)
         self._spec = spectrometer
         self._itQ = integration_times
+        self._calibration = calibration
   
     def run(self):
         while True:
@@ -479,6 +481,9 @@ class SpectrometerThread(PiccoloWorkerThread):
 
         spectrum.pixels = pixels
 
+        if self._calibration is not None and task.direction in self._calibration:
+            spectrum.update({'WavelengthCalibrationCoefficientsPiccolo': self._calibration[task.direction]})
+        
         # write results to the result queue
         self.results.put(spectrum)
 
@@ -497,7 +502,7 @@ class SpectrometerThread(PiccoloWorkerThread):
 class PiccoloSpectrometer(PiccoloInstrument):
     """Class to communicate with a spectrometer."""
 
-    def __init__(self, name, spectrometer=None):
+    def __init__(self, name, spectrometer=None,calibration=None):
         """Initialize a Piccolo Spectrometer object for Piccolo Server.
 
            The spectromter parameter must be the Spectrometer object from the
@@ -508,6 +513,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
            :param name: a descriptive name for the spectrometer.
            :param spectrometer: the spectromtere, which may be None.
+           :param calibration: dictionary containing list of wavenumber calibration coefficients for each channel
         """
 
         PiccoloInstrument.__init__(self, name)
@@ -525,7 +531,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
             self._serial = spectrometer.serialNumber
 
 
-        self._spectrometer = SpectrometerThread(name, spectrometer, self._busy, self._tQ, self._rQ, self._itQ)
+        self._spectrometer = SpectrometerThread(name, spectrometer, calibration, self._busy, self._tQ, self._rQ, self._itQ)
         self._spectrometer.start() # Start the thread.
         self.updateIntegrationTimes() # get integration times
 

@@ -316,21 +316,6 @@ class PiccoloThread(PiccoloWorkerThread):
         spectra = []
         for s in self._integrationTimes.spectrometers:
             spectrum = self._spectrometers[s].getSpectrum()
-            # Now read the additional calibration metadata from the instrument configuration file.
-            piccoloCfg = PiccoloConfig()
-            piccoloCfg.readCfg("/mnt/piccolo2_data/piccolo.config")
-            cfg = piccoloCfg.cfg
-            assert(s[0:2] == "S_") # s is the spectrometer name. Should begin with S_. Example: S_QEP00114
-            spectrometerSerialNumber = s[2:]
-            cal = cfg['calibrations']
-            print cal
-            if spectrometerSerialNumber in cal:
-                spectrometerCal = cal[spectrometerSerialNumber]
-                if shutter in spectrometerCal:
-                    spectrometerChannelCal = spectrometerCal[shutter]
-                    if 'wavelengthCalibrationCoefficientsPiccolo' in spectrometerChannelCal:
-                        WL = spectrometerChannelCal['wavelengthCalibrationCoefficientsPiccolo']
-                        spectrum.update({'WavelengthCalibrationCoefficientsPiccolo': WL})
             spectra.append(spectrum)
 
         self.closeShutter(shutter)
