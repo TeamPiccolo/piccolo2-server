@@ -138,7 +138,6 @@ class PiccoloDataDir(object):
     def getRunList(self):
         runs = []
         for p in os.listdir(self.datadir):
-            print p
             if os.path.isdir(self.join(p)):
                 runs.append(p)
         # sort by mtime

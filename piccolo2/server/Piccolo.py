@@ -110,7 +110,11 @@ class PiccoloThread(PiccoloWorkerThread):
         self._integrationTimes = IntegrationTimes(self._shutters.keys(),self._spectrometers.keys(),callback=self._itChanged)
         self._needDark = False
         self._auto = -1
-        self._currentRun = 'spectra'
+        try:
+            self._currentRun = self._datadir.getRunList()[-1]
+        except:
+            self._currentRun = 'spectra'
+        self.log.info("currentRun: %s"%self._currentRun)
         self._nCycles = 1
         self._delay = 0
         self._stateChanges = stateChanges
@@ -524,10 +528,7 @@ class Piccolo(PiccoloInstrument):
         self._messages = PiccoloMessages()
 
         # the record parameters
-        try:
-            self._currentRun = self._datadir.getRunList()[-1]
-        except:
-            self._currentRun = 'spectra'
+        self._currentRun = 'spectra'
         self._auto = -1
         self._nCycles = 1
         self._delay = 0
@@ -559,7 +560,10 @@ class Piccolo(PiccoloInstrument):
 
         # update the integration times
         self._tQ.put("getTimes")
-
+        # update currentRun
+        self._tQ.put("getCurrentRun")
+        self.status()
+        
     def _itChanged(self,shutter,spectrometer,t,s):
         self._messages.addMessage('IT|%s|%s'%(spectrometer,shutter))
 

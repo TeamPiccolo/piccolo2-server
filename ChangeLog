@@ -1,3 +1,7 @@
+2018-05-29 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: set current run directory in worker thread
+ * piccolo2/server/PiccoloDataDir.py: tidy away debug prints
+
 2018-05-28 Magnus Hagdorn
  * piccolo2/pserver.py: attach wavenmumber calibration coefficients
  * piccolo2/server/Piccolo.py: remove calibration hack
