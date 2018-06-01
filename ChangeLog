@@ -1,3 +1,8 @@
+2018-06-01 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: include timezone info
+ * piccolo2/server/PiccoloScheduler.py: handle timezone
+ * setup.py: require extra package to deal with timezone
+
 2018-05-29 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: set current run directory in worker thread
  * piccolo2/server/PiccoloDataDir.py: tidy away debug prints

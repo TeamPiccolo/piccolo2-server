@@ -32,7 +32,7 @@ import PiccoloSimplify
 import socket
 import psutil
 import subprocess
-import datetime
+import datetime, pytz
 import threading
 from Queue import Queue, Empty
 import time
@@ -941,7 +941,7 @@ class Piccolo(PiccoloInstrument):
         """get the current date and time
 
         :returns: isoformat date and time string"""
-        return datetime.datetime.now().isoformat()
+        return datetime.datetime.now(tz=pytz.utc).isoformat()
 
     def setClock(self,clock=None):
         """set the current date and time

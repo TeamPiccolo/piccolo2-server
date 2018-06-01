@@ -18,7 +18,8 @@
 __all__ = ['PiccoloScheduledJob','PiccoloScheduler']
 
 import logging
-import datetime
+import datetime, pytz
+from dateutil import parser
 
 from PiccoloInstrument import PiccoloInstrument
 
@@ -28,7 +29,7 @@ class PiccoloScheduledJob(object):
     a job will only get scheduled if it is in the future
     """
 
-    ISOFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+    ISOFORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
     def __init__(self,at_time,interval,job,end_time=None,jid=-1):
         """
@@ -49,7 +50,7 @@ class PiccoloScheduledJob(object):
         if isinstance(at_time,datetime.datetime):
             self._at = at_time
         else:
-            self._at = datetime.datetime.strptime(at_time,self.ISOFORMAT)
+            self._at = parser.parse(at_time)
 
         self._interval=None
         if interval!=None:
@@ -63,7 +64,7 @@ class PiccoloScheduledJob(object):
             if isinstance(end_time,datetime.datetime):
                 self._end = end_time
             else:
-                self._end = datetime.datetime.strptime(end_time,self.ISOFORMAT)
+                self._end = parser.parse(end_time)
 
         self._jid = jid
         self._job = job
@@ -71,7 +72,7 @@ class PiccoloScheduledJob(object):
         self._suspended = False
 
         # check that scheduled time is not in the past
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(tz=pytz.utc)
         if self._at < now and (self._end is None or self._end < now):
             self.log.warning("scheduled job is in the past")
             self._has_run = True
@@ -98,7 +99,7 @@ class PiccoloScheduledJob(object):
         if self._has_run or self.suspended:
             return False
         else:
-            return self._at < datetime.datetime.now()
+            return self._at < datetime.datetime.now(tz=pytz.utc)
 
     @property
     def suspended(self):
@@ -141,7 +142,7 @@ class PiccoloScheduledJob(object):
         for k in ['at_time','end_time']:
             dt = getattr(self,k)
             if dt!=None:
-                jobDict[k] = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                jobDict[k] = dt.strftime("%Y-%m-%dT%H:%M:%S%z")
             else:
                 jobDict[k] = ''
         if self.interval != None:
@@ -160,7 +161,7 @@ class PiccoloScheduledJob(object):
             self.log.debug("final run of job {0}".format(self.jid))
             self._has_run = True
         else:
-            n = (datetime.datetime.now()-self._at).total_seconds()//self._interval.total_seconds()+1
+            n = (datetime.datetime.now(tz=pytz.utc)-self._at).total_seconds()//self._interval.total_seconds()+1
             if n>1:
                 self.log.debug("job {0}: fast forwarding {1} times".format(self.jid,n))
                 dt = datetime.timedelta(seconds=n*self._interval.total_seconds())
@@ -260,7 +261,7 @@ class PiccoloScheduler(PiccoloInstrument):
         """get iterator over runable jobs"""
         inQuietTime = False
         if self.quietStart is not None:
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(tz=pytz.utc)
             qs = datetime.datetime.combine(now.date(),self.quietStart)
             qe = datetime.datetime.combine(now.date(),self.quietEnd)
             if qs > qe:
@@ -326,7 +327,7 @@ if __name__ == '__main__':
 
     ps = PiccoloScheduler()
 
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(tz=pytz.utc)
     
     ps.add(now+datetime.timedelta(seconds=5),"hello")
     ps.add(now+datetime.timedelta(seconds=10),"hello2",interval=datetime.timedelta(seconds=5))

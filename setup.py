@@ -31,6 +31,7 @@ setup(
         "CherryPy > 5",
         "python-daemon",
         "lockfile >= 0.9",
+        "python-dateutil",
     ],
     entry_points={
         'console_scripts': [
