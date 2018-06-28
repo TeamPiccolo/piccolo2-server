@@ -1,3 +1,6 @@
+2018-06-28 Magnus Hagdorn
+ * piccolo2/server/PiccoloSpectrometer.py: start using seabreeze drivers
+
 2018-06-01 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: include timezone info
  * piccolo2/server/PiccoloScheduler.py: handle timezone

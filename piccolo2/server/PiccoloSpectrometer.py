@@ -390,7 +390,64 @@ class SpectrometerThread(PiccoloWorkerThread):
         self._spec = spectrometer
         self._itQ = integration_times
         self._calibration = calibration
-  
+
+        self._minIntegrationTime = None
+        self._maxIntegrationTime = None
+        self._currentIntegrationTime = None
+
+        if self._spec is not None:
+            self._minIntegrationTime = self._spec.minimum_integration_time_micros/1000.
+
+    @property
+    def minIntegrationTime(self):
+        return self._minIntegrationTime
+    @minIntegrationTime.setter
+    def minIntegrationTime(self,ms):
+        """set minimum integration time in milliseconds"""
+        self._minIntegrationTime = max(ms,self._spec.minimum_integration_time_micros/1000.)
+    @property
+    def maxIntegrationTime(self):
+        return self._maxIntegrationTime
+    @maxIntegrationTime.setter
+    def maxIntegrationTime(self,ms):
+        """set maximum integration time in milliseconds"""
+        self._maxIntegrationTime = max(ms,self.minIntegrationTime+1.)
+    @property
+    def currentIntegrationTime(self):
+        return self._currentIntegrationTime
+    @currentIntegrationTime.setter
+    def currentIntegrationTime(self,ms):
+        """set the integration time in milliseconds"""
+        ms = max(self.minIntegrationTime,ms)
+        if self.maxIntegrationTime is not None:
+            ms = min(self.maxIntegrationTime,ms)
+        try:
+            self._spec.integration_time_micros(ms*1000.)
+        except Exception as e:
+            self.log.error('Could not set integration time to %f: %s'%(ms, e.message))
+            return
+        self._currentIntegrationTime = ms
+
+    @property
+    def metaData(self):
+        # TODO: sort out missing entrie
+        d = {
+            'SerialNumber': self._spec.serial_number,
+            'WavelengthCalibrationCoefficients': [0,1,0,0],
+            'IntegrationTime': self.currentIntegrationTime,
+            'IntegrationTimeUnits': 'milliseconds',
+            'OpticalPixelRange': [10, 1033],
+            'NonlinearityCorrectionCoefficients': list(self._spec._nc.coeffs[::-1]),
+            'SaturationLevel' : 200000,
+            'TemperatureHeatsink': None,
+            'TemperaturePCB': None,
+            'TemperatureMicrocontroller': None,
+            'TemperatureDetectorActual': None,
+            'TemperatureDetectorSet': None,
+            'TemperatureUnits': 'degrees Celcius'
+        }
+        return d
+        
     def run(self):
         while True:
             # wait for a new task from the task queue
@@ -474,10 +531,9 @@ class SpectrometerThread(PiccoloWorkerThread):
             pixels = [1]*100
         else:
             # Have a real spectrometer, so acquire a real spectrum.
-            self._spec.setIntegrationTime(task.integrationTime)
-            spectrum.update(self._spec.getMetadata())
-            self._spec.requestSpectrum()
-            pixels = self._spec.readSpectrum()
+            self.currrentIntegrationTime = task.integrationTime
+            spectrum.update(self.metaData)
+            pixels = self._spec.intensities()
 
         spectrum.pixels = pixels
 
@@ -491,11 +547,10 @@ class SpectrometerThread(PiccoloWorkerThread):
         self.log.debug("setting/getting integration times")
         for t in ['minIntegrationTime','maxIntegrationTime']:
             if getattr(task,t) is not None:
-                setattr(self._spec,t,getattr(task,t))
+                setattr(self,t,getattr(task,t))
         results = {}
         for t in ['minIntegrationTime','maxIntegrationTime','currentIntegrationTime']:
-            results[t] = getattr(self._spec,t)
-        results['currentIntegrationTime'] = results['currentIntegrationTime'].getMilliseconds()
+            results[t] = getattr(self,t)
         self._itQ.put(results)
             
             
@@ -527,8 +582,10 @@ class PiccoloSpectrometer(PiccoloInstrument):
         if spectrometer is None:
             self.log.warning('A PiccoloSpectrometer object has been created without a Spectrometer hadware object. This is usually only done for testing the Piccolo code. You should not see this message during normal operation.')
             self._serial = None
+            self._model = None
         else:
-            self._serial = spectrometer.serialNumber
+            self._serial = spectrometer.serial_number
+            self._model = spectrometer.model
 
 
         self._spectrometer = SpectrometerThread(name, spectrometer, calibration, self._busy, self._tQ, self._rQ, self._itQ)
@@ -539,6 +596,13 @@ class PiccoloSpectrometer(PiccoloInstrument):
         # send poison pill to worker
         self._tQ.put(None)
 
+    @property
+    def model(self):
+        return self._model
+    @property
+    def serial(self):
+        return self._serial
+        
     def updateIntegrationTimes(self,minIntegrationTime=None,maxIntegrationTime=None):
         if self._busy.locked():
             self.log.warning("busy, cannot manipulate integration times")
@@ -583,6 +647,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
         :rtype: dict"""
 
         return {'serial' : self._serial,
+                'model' : self._model,
                 'nSpectra' : self.numSpectra(),
                 'status' : self.status(),
                 'currentIntegrationTime' : self.getCurrentIntegrationTime(),
@@ -698,32 +763,26 @@ if __name__ == '__main__':
     from piccoloLogging import *
     #from matplotlib import pyplot as plt
 
-    have_hardware = False # True if the hardware drivers are available
-    try:
-        from piccolo2.hardware import spectrometers as piccolo_spectrometers
-        have_hardware = True
-    except ImportError as e:
-        print "Hardware drivers are not available."
-
+    import seabreeze.spectrometers as seabreeze
+    
     piccoloLogging(debug=True)
-
+    
     # Detect and initialize the spectrometers, or simulate some spectrometers if
     # none are connected.
     spectrometers = []
-    if have_hardware:
-        for s in piccolo_spectrometers.getConnectedSpectrometers():
-            #strip out all non-alphanumeric characters
-            sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
-            spectrometers.append(PiccoloSpectrometer(sname,spectrometer=s))
+    for s in seabreeze.list_devices():
+        #strip out all non-alphanumeric characters
+        sname = 'S_'+"".join([c for c in s.serial if c.isalpha() or c.isdigit()])
+        spectrometers.append(PiccoloSpectrometer(sname,spectrometer=seabreeze.Spectrometer(s)))
+
+    haveSpectrometers = True
     if len(spectrometers) == 0: # No hardware drivers, or no spectrometers detected.
+        haveSpectrometers = False
         nSpectrometers = 2
         print "No spectrometers connected. {} spectrometers will be simulated.".format(nSpectrometers)
         for i in range(nSpectrometers):
             sname = 'spectrometer{}'.format(i)
-            if have_hardware:
-                s = piccolo_spectrometers.SimulatedOceanOpticsSpectrometer(sname)
-            else:
-                s = none
+            s = none
             # Create a spectrometer, but don't pass a spectrometer object.
             spectrometers.append(PiccoloSpectrometer(sname,spectrometer=s))
 
@@ -731,27 +790,31 @@ if __name__ == '__main__':
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
         print info
+
+    if not haveSpectrometers:
+        sys.exit(0)
+
         
     best = {}
-    print 'Determining best integration times...'
-    # This will fail if tested with "simulated" spectroemters.
     for s in spectrometers:
-        serial = s.info()['serial']
-        s.autointegrate()
-        r = s.getAutointegrateResult()
-        if not r.success:
-            # Autointegration failed.
-            print "Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage)
-            sys.exit(1)
-        t = r.bestIntegrationTime
-        print 'Spectrometer {} integration time {} ms'.format(serial, t)
-        best[serial] = t
+        best[s.serial] = 10.
+##    print 'Determining best integration times...'
+##    # This will fail if tested with "simulated" spectroemters.
+##    for s in spectrometers:
+##        serial = s.info()['serial']
+##        s.autointegrate()
+##        r = s.getAutointegrateResult()
+##        if not r.success:
+##            # Autointegration failed.
+##            print "Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage)
+##            sys.exit(1)
+##        t = r.bestIntegrationTime
+##        print 'Spectrometer {} integration time {} ms'.format(serial, t)
+##        best[serial] = t
 
     print 'Starting acquisitions...'
-    for i in range(len(spectrometers)):
-        serial = spectrometers[i].info()['serial']
-        t = best[serial]
-        spectrometers[i].acquire(milliseconds=t)
+    for s in spectrometers:
+        s.acquire(milliseconds=best[s.serial])
 
     for s in spectrometers:
         info = s.info()
@@ -763,14 +826,16 @@ if __name__ == '__main__':
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
+
+    from matplotlib import pyplot as plt
     spectra = PiccoloSpectraList()
     for s in spectrometers:
         spec = s.getSpectrum()
         print "Got a spectrum with {} pixels".format(spec.getNumberOfPixels())
-        plt.plot(spec.pixels)
-        plt.show()
+        plt.plot(spec.waveLengths,spec.pixels)
         spectra.append(spec)
 #    spectra.write()
+    plt.show()
 
 
     time.sleep(0.5)
