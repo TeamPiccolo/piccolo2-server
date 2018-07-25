@@ -1,3 +1,7 @@
+2018-07-25 Magnus Hagdorn
+ * piccolo2/server/PiccoloSpectrometer.py: fix acquire task and get
+   autointegration to work
+
 2018-06-28 Magnus Hagdorn
  * piccolo2/server/PiccoloSpectrometer.py: start using seabreeze drivers
 

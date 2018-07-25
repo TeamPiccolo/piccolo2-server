@@ -29,20 +29,14 @@ __all__ = ['PiccoloSpectrometer']
 from piccolo2.PiccoloSpectra import *
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloWorkerThread import PiccoloWorkerThread
+import random
 import time
 import threading
 from Queue import Queue
 import logging
-try:
-    from piccolo2.hardware.spectrometers import AutointegrationNoLightError
-    from piccolo2.hardware.spectrometers import AutointegrationUnstableLightError
-    from piccolo2.hardware.spectrometers import AutointegrationExceededMaximumIntegrationTimeError
-except ImportError:
-    logging.warn("Using outdated spectrometer drivers.")
-    AutointegrationNoLightError = Exception
-    AutointegrationUnstableLightError = Exception
-    AutointegrationExceededMaximumIntegrationTimeError = Exception
-import sys
+import numpy
+from scipy import signal
+import os,os.path, sys
 
 class Task(object):
     """Instructions for a specific action which the spectrometer is to perform.
@@ -52,7 +46,16 @@ class Task(object):
 
     Every Task produces a corresponding Result, defined in the Result class.
     """
-    pass
+
+    NAME = 'task'
+
+    def __init__(self):
+        self._log = logging.getLogger('{0}.{1}'.format('piccolo.task',self.NAME))
+
+    @property
+    def log(self):
+        """get the logger"""
+        return self._log
 
 class AcquireTask(Task):
     """Class to hold instructions for acquiring a spectrum.
@@ -63,7 +66,10 @@ class AcquireTask(Task):
     dark spectrum, the shutter is closed during the acquisition.
     """
 
+    NAME = 'aquire'
+    
     def init(self):
+        Task.__init__(self)
         self._direction = None # Can be 'upwelling' or 'downwelling'. No default.
         self._integrationTime = None # milliseconds. No default.
         self._dark = False # True if dark, False if light. Default: False.
@@ -154,24 +160,20 @@ class AutointegrateTask(Task):
 
     The autointegration task is used to prepare a spectrometer autointegration.
 
-    Two parameters must be provided:
+    One parameter must be provided:
 
     1. How close should the spectrum be to saturation?
-    2. What's the longest integration time that would be acceptable?
 
-    The first of these could be specified as a percentage of the spectrometer's
+    It could be specified as a percentage of the spectrometer's
     saturation level. A value of 70 per cent would be typical and allow space
     for any fluctuation in the light level during the acquisition of a batch.
 
-    The second parameter should default to the maximum integration time
-    supported by the spectrometer. There is likely to be a user-specified
-    maximum integration time at which spectra will be acquired. Longer than this
-    and spectra are too noisy to be used.
     """
 
+    NAME = 'autoIntegrate'
+    
     def __init__(self):
-        self._tmin = None # Minimum permitted integration time in milliseconds.
-        self._tmax = None # Maximum permitted integration time in milliseconds.
+        Task.__init__(self)
         self._target = 0.7 # Best peak counts as a percentage of saturation.
 
     @property
@@ -231,80 +233,13 @@ class AutointegrateTask(Task):
             raise Exception('The autointegration peak value must be a percentage. {} is type {}.'.format(p, type(p)))
         self.target = p_float / float(100)
 
-    @property
-    def minimumIntegrationTime(self):
-        """Get the minimum integration time that autointegration can return.
-
-        :returns:  float -- integration time in milliseconds.
-        """
-        return self._tmin
-        
-    @minimumIntegrationTime.setter
-    def minimumIntegrationTime(self, t):
-        """Set the minimum integration time that autointegration will go to.
-
-        Autointegration determines the best integration time for the spectrum.
-        This function sets the minimum integration time that it may return. It
-        can be used to avoid having autointegration set very long integration
-        times on the spectrometer.
-
-        The default value is None. If set to None, it will default to the
-        minimum integration time supported by the spectrometer. This will vary
-        from model to model, but is typically about 1 min.
-
-        :param t: minimum integration time in milliseconds.
-        :type t: float or int
-        """
-        try:
-            tFloat = float(t) # t could be an integer or a float.
-        except ValueError as e:
-            raise ValueError('The integration time must be a number. {} is {}.'.format(t, type(t)))
-        if tFloat < 0:
-            raise ValueError("The integration time cannot be negative.")
-        self._tmin = tFloat
-
-    @property
-    def maximumIntegrationTime(self):
-        """Get the maximum integration time that autointegration can return.
-
-        :returns:  float -- integration time in milliseconds.
-        """
-        return self._tmax
-
-    @maximumIntegrationTime.setter
-    def maximumIntegrationTime(self, t):
-        """Set the maximum integration time that autointegration will go to.
-
-        Autointegration determines the best integration time for the spectrum.
-        This function sets the maximum integration time that it may return. It
-        can be used to avoid having autointegration set very long integration
-        times on the spectrometer.
-
-        The default value is None. If set to None, it will default to the
-        maximum integration time supported by the spectrometer. This will vary
-        from model to model, but is typically about 1 min.
-
-        :param t: maximum integration time in milliseconds.
-        :type t: float or int
-        """
-        try:
-            tFloat = float(t) # t could be an integer or a float.
-        except ValueError as e:
-            raise ValueError('The integration time must be a number. {} is {}.'.format(t, type(t)))
-        if tFloat < 0:
-            raise ValueError("The integration time cannot be negative.")
-        self._tmax = tFloat
-
     def __str__(self):
-        t_max = self.maximumIntegrationTime
-        if t_max is None:
-            max_string = ""
-        else:
-            max_string = " and {} ms maximum integration time".format(t_max)
-        return "target {}% of saturation".format(self.targetPercent) + max_string
+        return "target {}% of saturation".format(self.targetPercent)
 
 class MinMaxIntegrationTimeTask(Task):
+    NAME = 'minmax'
     def __init__(self,minTime=None,maxTime=None):
+        Task.__init__(self)
         self.minIntegrationTime = minTime
         self.maxIntegrationTime = maxTime
     
@@ -395,9 +330,35 @@ class SpectrometerThread(PiccoloWorkerThread):
         self._maxIntegrationTime = None
         self._currentIntegrationTime = None
 
-        if self._spec is not None:
-            self._minIntegrationTime = self._spec.minimum_integration_time_micros/1000.
+        # for autointegration
+        self._integrationTimeIncrement = 1.
 
+        self._numTries = 5
+        
+        if self._spec is not None:
+            # mode(0) is continous triggering
+            self._spec.trigger_mode(0)
+            self._minIntegrationTime = self._spec.minimum_integration_time_micros/1000.
+            self._maxIntegrationTime = 20*self._minIntegrationTime
+
+    def _getIntensities(self, correct_dark_counts=False, correct_nonlinearity=False):
+        gotData = False
+        for i in range(self._numTries):
+            try:
+                self.log.debug('get intensities, attempt %d/%d'%(i+1,self._numTries))
+                pixels = self._spec.intensities( correct_dark_counts=correct_dark_counts, correct_nonlinearity=correct_nonlinearity)
+                self.log.debug('got intensities')
+                gotData = True
+            except:
+                self.log.warning('failed to get spectrum on try %d/%d'%(i+1,self._numTries))
+                time.sleep(0.1)
+            if gotData:
+                break
+        else:
+            self.log.error('failed to get spectrum after %d tries'%self._numTries)
+            pixels = numpy.zeros(self._spec.pixels,dtype=int)
+        return pixels
+            
     @property
     def minIntegrationTime(self):
         return self._minIntegrationTime
@@ -421,11 +382,16 @@ class SpectrometerThread(PiccoloWorkerThread):
         ms = max(self.minIntegrationTime,ms)
         if self.maxIntegrationTime is not None:
             ms = min(self.maxIntegrationTime,ms)
-        try:
-            self._spec.integration_time_micros(ms*1000.)
-        except Exception as e:
-            self.log.error('Could not set integration time to %f: %s'%(ms, e.message))
-            return
+
+        if self._currentIntegrationTime is not None and abs(ms-self._currentIntegrationTime) < 1e-5:
+             # nothing to do
+             return
+
+        self.log.debug('setting integration time to %fms'%ms)
+        self._spec.integration_time_micros(ms*1000.)
+
+        # get a spectrum and discard to make sure it is set to the new time
+        self._getIntensities()
         self._currentIntegrationTime = ms
 
     @property
@@ -438,7 +404,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             'IntegrationTimeUnits': 'milliseconds',
             'OpticalPixelRange': [10, 1033],
             'NonlinearityCorrectionCoefficients': list(self._spec._nc.coeffs[::-1]),
-            'SaturationLevel' : 200000,
+            'SaturationLevel' : 65000,
             'TemperatureHeatsink': None,
             'TemperaturePCB': None,
             'TemperatureMicrocontroller': None,
@@ -447,13 +413,14 @@ class SpectrometerThread(PiccoloWorkerThread):
             'TemperatureUnits': 'degrees Celcius'
         }
         return d
-        
+
     def run(self):
         while True:
             # wait for a new task from the task queue
             task = self.tasks.get()
             if task == None:
                 # The worker thread can be stopped by putting a None onto the task queue.
+                self._spec.close()
                 self.log.info('Stopped worker thread for specrometer {}.'.format(self.name))
                 return
             self._performTask(task)
@@ -481,28 +448,123 @@ class SpectrometerThread(PiccoloWorkerThread):
         # task should now be on the results queue waiting to be picked up.
         self.busy.release()
 
+    def findBestIntegrationTime(self, targetSaturation, debug=False):
+        msg = 'ok'
+        if self._spec is None:
+            # no real spectrometer attached, create a random value
+            t = random.uniform(self.minIntegrationTime, self.maxIntegrationTime)
+            return msg,t
+
+        # Define some parameters
+        spectra = []
+        smoothed_spectra = []
+        integrationTimes = []
+        medianWidth = 51 # pixels. Width of the median filter used to smooth spectra.
+        maxLightSteps = 10 # the maximum number of steps to find the light
+        numSpectra = 5 # the number of spectra to take for fitting
+        deltaT = self._integrationTimeIncrement
+
+        if debug:
+            debugdir=os.path.join('/tmp',time.strftime('autointegrate-%Y%m%d-%H%m%S'))
+            try:
+                if not os.path.exists(debugdir):
+                    os.makedirs(debugdir)
+            except:
+                self.debug.warn('cannot create debug directory %s, disabling debug'%debugdir)
+                debug = False
+            
+        
+        self.currentIntegrationTime = self.minIntegrationTime
+        self.log.debug("looking for light")
+        for i in range(maxLightSteps):
+            spectrum = self._getIntensities()
+            if debug:
+                with open(os.path.join(debugdir,'light.%d.data'%i),'w') as out:
+                    for p in spectrum:
+                        out.write('%d\n'%p)
+            if haveLight(spectrum):
+                self.log.debug("detected light with integration time %fms"%self.currentIntegrationTime)
+                integrationTimes.append(self.currentIntegrationTime)
+                spectra.append(spectrum)
+                smoothed_spectra.append(smoothSpectrum(spectrum))
+                break
+            self.currentIntegrationTime = self.currentIntegrationTime + deltaT
+            deltaT = 2*deltaT # Double the time step for the next attempt.
+        else:
+            msg="failed to detect light after %d iterations"%maxLightSteps
+            self.log.warning(msg)
+            return msg,None
+        self.log.debug("found light at %fms"%self.currentIntegrationTime)
+
+        self.log.debug("acquire spectra for fitting")
+        # deltaT = max(self._integrationTimeIncrement,deltaT/2.)
+        for i in range(numSpectra):
+            self.currentIntegrationTime = self.currentIntegrationTime + deltaT
+            spectrum = self._getIntensities()
+            # make sure we got light
+            for j in range(5):
+                if haveLight(spectrum):
+                    break
+                spectrum = self._getIntensities()
+            else:
+                msg="lost light after 5 attempts"
+                self.log.warning(msg)
+                return msg,None
+            if debug:
+                with open(os.path.join(debugdir,'fit.%d.data'%i),'w') as out:
+                    for p in spectrum:
+                        out.write('%d\n'%p)
+            integrationTimes.append(self.currentIntegrationTime)
+            spectra.append(spectrum)
+            smoothed_spectra.append(smoothSpectrum(spectrum))
+        self.log.debug("find peaks and fit line")
+        peakind = signal.find_peaks_cwt(smoothed_spectra[-1],numpy.arange(1,10))
+        maxpeak = peakind[numpy.argmax(smoothed_spectra[-1][peakind])]
+        peaks = []
+        for i in range(len(spectra)):
+            peaks.append(spectra[i][maxpeak])
+        if debug:
+            with open(os.path.join(debugdir,'peaks'),'w') as out:
+                for i in range(len(spectra)):
+                    out.write("%f %f\n"%(peaks[i],integrationTimes[i]))
+        fit = numpy.poly1d(numpy.polyfit(peaks,integrationTimes,2))
+        bestIntegrationTime = fit(targetSaturation)
+        self.log.debug("successful autointegration, best time %f"%bestIntegrationTime)
+
+        return msg,bestIntegrationTime
+        
+        
     def _performAutointegrateTask(self, task):
+        """
+        The best integration gives a spectrum which peaks close to the
+        saturation level, but with some margin. The default setting of 70 %
+        finds an integraiton time that gives a peak at approximately 70 % of the
+        saturation level.
+
+        If no light is entering the spectrometer, an exception is raised.
+        """
+        
         self.log.debug('Performing an autointegrate task: {}'.format(task))
         # Create the result object.
         result = AutointegrateResult()
-        # Need to add support for a maximum integration time (at which
-        # the algorithm will fail).
-        t = None
+
+        # remember old integration time
+        if self.currentIntegrationTime is None:
+            oldIntegrationTime = self.minIntegrationTime
+        else:
+            oldIntegrationTime = self.currentIntegrationTime
+        result.bestIntegrationTime = oldIntegrationTime
+
         try:
-            t = self._spec.findBestIntegrationTime(percent=task.targetPercent)
-            result.bestIntegrationTime = t
-        except AutointegrationNoLightError as e:
-            # The exception will contain a message with information about why
-            # autointegration failed. Copy this message into the result object.
-            result.errorMessage = e.message
-        except AutointegrationUnstableLightError as e:
-            result.errorMessage = e.message
-        except AutointegrationExceededMaximumIntegrationTimeError as e:
-            result.errorMessage = e.message
+            msg,bestTime = self.findBestIntegrationTime(task.target*self.metaData['SaturationLevel'])
+            if bestTime is None:
+                result.errorMessage = msg
+            else:
+                result.bestIntegrationTime = bestTime
         except Exception as e:
-            # Get information about the exception.
-            self.log.exception('An unanticipated error occured during autointegration on spectroemter {}.'.format(self._spec.serialNumber))
+            self.log.error('autointegration failed: %s'%e.message)
             result.errorMessage = e.message
+
         self.results.put(result)
 
     def _performAcquireTask(self, task):
@@ -524,16 +586,20 @@ class SpectrometerThread(PiccoloWorkerThread):
         spectrum['name'] = self.name
 
         # record data
-        if self._spec==None:
+        if self._spec is None:
             # If spectrometer is None, thenm simulate a spectrometer, for
             # testing purposes.
             time.sleep(task.integrationTime/1000.)
             pixels = [1]*100
         else:
             # Have a real spectrometer, so acquire a real spectrum.
-            self.currrentIntegrationTime = task.integrationTime
-            spectrum.update(self.metaData)
-            pixels = self._spec.intensities()
+            try:
+                self.currentIntegrationTime = task.integrationTime
+                pixels = self._getIntensities()
+                spectrum.update(self.metaData)
+            except Exception as e:
+                self.log.error('failed to get spectrum')
+                pixels = [1]*self._spec.pixels
 
         spectrum.pixels = pixels
 
@@ -615,6 +681,7 @@ class PiccoloSpectrometer(PiccoloInstrument):
         self._maxIntegrationTime = times['maxIntegrationTime']
         
     def getCurrentIntegrationTime(self):
+        self.updateIntegrationTimes()
         return self._currentIntegrationTime
     def getMinIntegrationTime(self):
         return self._minIntegrationTime
@@ -737,8 +804,6 @@ class PiccoloSpectrometer(PiccoloInstrument):
 
         # Create an autointegrate task.
         task = AutointegrateTask()
-        task.minimumIntegrationTime = self.getMinIntegrationTime()
-        task.maximumIntegrationTime = self.getMaxIntegrationTime()
 
         # Put the autointegrate task onto the task queue.
         self._tQ.put(task)
@@ -747,12 +812,13 @@ class PiccoloSpectrometer(PiccoloInstrument):
     def getAutointegrateResult(self):
         """Returns the best integration time."""
         block=True
+        time.sleep(0.5)
         if self._busy.locked():
             self.log.debug("busy, waiting until the autointegration procedure has completed")
             timeout = None
         else:
-            self.log.debug("idle, waiting at most 20s")
             timeout = 20
+            self.log.debug("idle, waiting at most %f"%timeout)
         result = self._rQ.get(block, timeout)
         if isinstance(result, AutointegrateResult):
             return result
@@ -764,6 +830,7 @@ if __name__ == '__main__':
     #from matplotlib import pyplot as plt
 
     import seabreeze.spectrometers as seabreeze
+    from piccolo2.hardware import Shutter,SHUTTER_1,SHUTTER_2
     
     piccoloLogging(debug=True)
     
@@ -794,23 +861,30 @@ if __name__ == '__main__':
     if not haveSpectrometers:
         sys.exit(0)
 
-        
+
+    shutter = Shutter(SHUTTER_1)
+
+    shutter.open()
+    
     best = {}
     for s in spectrometers:
-        best[s.serial] = 10.
-##    print 'Determining best integration times...'
-##    # This will fail if tested with "simulated" spectroemters.
-##    for s in spectrometers:
-##        serial = s.info()['serial']
-##        s.autointegrate()
-##        r = s.getAutointegrateResult()
-##        if not r.success:
-##            # Autointegration failed.
-##            print "Autointegration on spectrometer {} failed: {}".format(serial, r.errorMessage)
-##            sys.exit(1)
-##        t = r.bestIntegrationTime
-##        print 'Spectrometer {} integration time {} ms'.format(serial, t)
-##        best[serial] = t
+        best[s.serial] =  20000.
+        s.setMaxIntegrationTime(60000)
+        
+    if True:
+        print 'Determining best integration times...'
+        # This will fail if tested with "simulated" spectroemters.
+        for s in spectrometers:
+            s.autointegrate()
+
+        for s in spectrometers:
+            serial = s.info()['serial']
+            r = s.getAutointegrateResult()
+            if r.success:
+                # Autointegration failed.
+                t = r.bestIntegrationTime
+                print 'Spectrometer {} integration time {} ms'.format(serial, t)
+                best[serial] = t
 
     print 'Starting acquisitions...'
     for s in spectrometers:
@@ -820,13 +894,15 @@ if __name__ == '__main__':
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
-    print 'Waiting for half a second...'
-    time.sleep(0.5)
+    print 'Waiting for a second...'
+    time.sleep(1)
     for s in spectrometers:
         info = s.info()
         print 'Spectrometer {} is {}'.format(info['serial'], info['status'])
 
 
+    shutter.close()
+        
     from matplotlib import pyplot as plt
     spectra = PiccoloSpectraList()
     for s in spectrometers:
