@@ -550,13 +550,6 @@ class SpectrometerThread(PiccoloWorkerThread):
         # Create the result object.
         result = AutointegrateResult()
 
-        # remember old integration time
-        if self.currentIntegrationTime is None:
-            oldIntegrationTime = self.minIntegrationTime
-        else:
-            oldIntegrationTime = self.currentIntegrationTime
-        result.bestIntegrationTime = oldIntegrationTime
-
         try:
             msg,bestTime = self.findBestIntegrationTime(task.target*self.metaData['SaturationLevel'])
             if bestTime is None:

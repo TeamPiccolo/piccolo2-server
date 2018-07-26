@@ -434,8 +434,8 @@ class PiccoloThread(PiccoloWorkerThread):
                                 spectra.append(s)
                             # check for abort/shutdown
                             cmd = self._getCommands(block=False)
-                        if dark:
-                            self._needDark = False
+                            if dark:
+                                self._needDark = False
                         if cmd in ['abort','shutdown']:
                             break
 

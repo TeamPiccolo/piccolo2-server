@@ -1,4 +1,8 @@
 2018-07-26 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py: fix logic with dark recording
+ * piccolo2/server/PiccoloSpectrometer.py: remove unnecessary code
+
+2018-07-26 Magnus Hagdorn
  * piccolo2/pserver.py: use seabreeze drivers
  * piccolo2/server/Piccolo.py: re-order measurements to reduce number of
    integration time changes
