@@ -340,6 +340,7 @@ class SpectrometerThread(PiccoloWorkerThread):
             self._spec.trigger_mode(0)
             self._minIntegrationTime = self._spec.minimum_integration_time_micros/1000.
             self._maxIntegrationTime = 20*self._minIntegrationTime
+            self.currentIntegrationTime = self.minIntegrationTime
 
     def _getIntensities(self, correct_dark_counts=False, correct_nonlinearity=False):
         gotData = False
@@ -517,17 +518,18 @@ class SpectrometerThread(PiccoloWorkerThread):
             integrationTimes.append(self.currentIntegrationTime)
             spectra.append(spectrum)
             smoothed_spectra.append(smoothSpectrum(spectrum))
+            
         self.log.debug("find peaks and fit line")
-        peakind = signal.find_peaks_cwt(smoothed_spectra[-1],numpy.arange(1,10))
-        maxpeak = peakind[numpy.argmax(smoothed_spectra[-1][peakind])]
         peaks = []
         for i in range(len(spectra)):
-            peaks.append(spectra[i][maxpeak])
+            peakind = signal.find_peaks_cwt(smoothed_spectra[i],numpy.arange(1,20))
+            maxpeak = peakind[numpy.argmax(smoothed_spectra[i][peakind])]
+            peaks.append(smoothed_spectra[i][maxpeak])
         if debug:
             with open(os.path.join(debugdir,'peaks'),'w') as out:
                 for i in range(len(spectra)):
                     out.write("%f %f\n"%(peaks[i],integrationTimes[i]))
-        fit = numpy.poly1d(numpy.polyfit(peaks,integrationTimes,2))
+        fit = numpy.poly1d(numpy.polyfit(peaks,integrationTimes,1))
         bestIntegrationTime = fit(targetSaturation)
         self.log.debug("successful autointegration, best time %f"%bestIntegrationTime)
 

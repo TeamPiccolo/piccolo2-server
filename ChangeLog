@@ -1,3 +1,10 @@
+2018-07-26 Magnus Hagdorn
+ * piccolo2/pserver.py: use seabreeze drivers
+ * piccolo2/server/Piccolo.py: re-order measurements to reduce number of
+   integration time changes
+ * piccolo2/server/PiccoloSpectrometer.py: find peaks for all spectra; fit a 
+   line rather than parabola
+
 2018-07-25 Magnus Hagdorn
  * piccolo2/server/PiccoloSpectrometer.py: fix acquire task and get
    autointegration to work

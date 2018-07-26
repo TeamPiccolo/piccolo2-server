@@ -24,12 +24,8 @@ import sys
 import logging
 import os
 
-HAVE_PICCOLO_DRIVER = True
-try:
-    from piccolo2.hardware import shutters as piccolo_shutters
-    from piccolo2.hardware import spectrometers as piccolo_spectrometers
-except:
-    HAVE_PICCOLO_DRIVER = False
+import seabreeze.spectrometers as seabreeze
+from piccolo2.hardware import shutters as piccolo_shutters
 
 def piccolo_server(serverCfg):
 
@@ -70,9 +66,6 @@ def piccolo_server(serverCfg):
         if piccoloCfg.cfg['channels'][c]['shutter'] == -1:
             shutter = None
         else:
-            if not HAVE_PICCOLO_DRIVER:
-                log.error('piccolo low-level drivers are not available')
-                sys.exit(1)
             shutter = piccolo_shutters.Shutter(getattr(piccolo_shutters,'SHUTTER_%d'%piccoloCfg.cfg['channels'][c]['shutter']))
         shutters[c] = piccolo.PiccoloShutter(c, shutter=shutter,
                                              reverse=piccoloCfg.cfg['channels'][c]['reverse'],
@@ -82,25 +75,21 @@ def piccolo_server(serverCfg):
 
     # initialise the spectrometers
     spectrometers = {}
-    if HAVE_PICCOLO_DRIVER:
-        for s in piccolo_spectrometers.getConnectedSpectrometers():
-            #strip out all non-alphanumeric characters
-            sname = 'S_'+"".join([c for c in s.serialNumber if c.isalpha() or c.isdigit()])
-            spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s,calibration=piccoloCfg.getCalibration(sname[2:]))
+    for s in seabreeze.list_devices():
+        #strip out all non-alphanumeric characters
+        sname = 'S_'+"".join([c for c in s.serial if c.isalpha() or c.isdigit()])
+        spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=seabreeze.Spectrometer(s),calibration=piccoloCfg.getCalibration(sname[2:]))
     if len(spectrometers) == 0:
         for sn in piccoloCfg.cfg['spectrometers']:
             sname = 'S_'+sn
-            if HAVE_PICCOLO_DRIVER:
-                s = piccolo_spectrometers.SimulatedOceanOpticsSpectrometer(sn)
-            else:
-                s = None
+            s = None
             spectrometers[sname] = piccolo.PiccoloSpectrometer(sname,spectrometer=s,calibration=piccoloCfg.getCalibration(sname[2:]))
     # Set the spectrometer temperatures (for spectrometers that have a settable detector temperature).
     hasTEC = dict() # The spectrometer has a TEC and its temperature can be adjusted.
     temperaturesToSet = dict()
     for sname in spectrometers:
-        spectrometer_serial_number = spectrometers[sname]._spectrometer._spec.serialNumber
-        hasTEC[spectrometer_serial_number] = spectrometers[sname]._spectrometer._spec.detectorTemperatureCanBeSet
+        spectrometer_serial_number = spectrometers[sname]._spectrometer._spec.serial_number
+        #FIXME hasTEC[spectrometer_serial_number] = spectrometers[sname]._spectrometer._spec.detectorTemperatureCanBeSet
     for spectrometer_serial_number in piccoloCfg.cfg['spectrometers']:
         spectrometer_custom_configuration = piccoloCfg.cfg['spectrometers'][spectrometer_serial_number]
         if 'temperatureDetectorSet' in spectrometer_custom_configuration:
@@ -113,7 +102,7 @@ def piccolo_server(serverCfg):
     for s in temperaturesToSet:
         if s in hasTEC:
             for sname in spectrometers:
-                if spectrometers[sname]._spectrometer._spec.serialNumber == s:
+                if spectrometers[sname]._spectrometer._spec.serial_number == s:
                     log.info('Setting the detector temperature of {} to {} °C...'.format(sname, temperaturesToSet[s]))
                     spectrometers[sname]._spectrometer._spec.set_tec_setpoint(float(temperaturesToSet[s]))
             #set_tec_setpoint(temperaturesToSet)

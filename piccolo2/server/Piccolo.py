@@ -66,6 +66,8 @@ class IntegrationTimes(object):
 
     def setTime(self,shutter,spectrometer,t,source=0):
         changed=False
+        if t is None:
+            return
         if abs(self._integrationTime[shutter][spectrometer] - t) > 1e-8:
             changed = True
             self._integrationTime[shutter][spectrometer] = t
@@ -424,8 +426,8 @@ class PiccoloThread(PiccoloWorkerThread):
                             measurements.reverse()
 
                     # loop over measurements
-                    for dark in measurements:
-                        for shutter in self._shutters:
+                    for shutter in self._shutters:
+                        for dark in measurements:
                             for s in self.record(shutter,dark):
                                 # Insert the batch and sequence numbers into the metadata.
                                 s.update({'Batch': batchNr,'Run':self._currentRun})
