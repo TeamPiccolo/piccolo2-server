@@ -1,3 +1,8 @@
+2018-07-31 Magnus Hagdorn
+ * piccolo2/server/PiccoloConfig.py: set default wavenumber coefficients
+ * piccolo2/server/PiccoloSpectrometer.py: always use the piccolo wavenumber 
+   coefficients
+
 2018-07-26 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: fix logic with dark recording
  * piccolo2/server/PiccoloSpectrometer.py: remove unnecessary code

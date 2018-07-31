@@ -100,7 +100,7 @@ class PiccoloConfig(object):
             if spectrometer in self.cfg['calibrations'] and c in self.cfg['calibrations'][spectrometer]:
                 calibration[c] = self.cfg['calibrations'][spectrometer][c]['wavelengthCalibrationCoefficientsPiccolo']
             else:
-                calibration[c] = None
+                calibration[c] = [ 0., 1., 0., 0. ]
         return calibration
                 
 if __name__ == '__main__':

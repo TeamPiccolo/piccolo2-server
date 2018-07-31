@@ -599,7 +599,7 @@ class SpectrometerThread(PiccoloWorkerThread):
         spectrum.pixels = pixels
 
         if self._calibration is not None and task.direction in self._calibration:
-            spectrum.update({'WavelengthCalibrationCoefficientsPiccolo': self._calibration[task.direction]})
+            spectrum.update({'WavelengthCalibrationCoefficients': self._calibration[task.direction]})
         
         # write results to the result queue
         self.results.put(spectrum)
