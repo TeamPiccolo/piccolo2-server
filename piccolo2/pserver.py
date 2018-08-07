@@ -59,24 +59,39 @@ def piccolo_server(serverCfg):
 
     # initialise the shutters
     ok=True
-    for c in ['upwelling','downwelling']:
-        if c not in piccoloCfg.cfg['channels']:
-            log.error('{} shutter not defined'.format(c))
-            ok=False
-    if not ok:
-        sys.exit(1)
     shutters = {}
     for c in piccoloCfg.cfg['channels']:
-        if piccoloCfg.cfg['channels'][c]['shutter'] == -1:
+        parsed = c.startswith('shutter_')
+        if parsed:
+            shutter_num = c.split('_')
+            try:
+                shutter_num = int(shutter_num[1])
+            except:
+                parsed = False
+        if not parsed:
+            log.error('cannot parse shutter %s'%c)
+            ok = False
+            continue
+
+        if HAVE_PICCOLO_DRIVER:
+            try:
+                shutter = piccolo_shutters.Shutter(getattr(piccolo_shutters,'SHUTTER_%d'%shutter_num))
+            except Exception as e:
+                log.error('getting shutter %s: %s'%(c,str(e)))
+                ok = False
+                continue
+        else: 
             shutter = None
-        else:
-            if not HAVE_PICCOLO_DRIVER:
-                log.error('piccolo low-level drivers are not available')
-                sys.exit(1)
-            shutter = piccolo_shutters.Shutter(getattr(piccolo_shutters,'SHUTTER_%d'%piccoloCfg.cfg['channels'][c]['shutter']))
-        shutters[c] = piccolo.PiccoloShutter(c, shutter=shutter,
+            
+        d = piccoloCfg.cfg['channels'][c]['direction']
+        shutters[d] = piccolo.PiccoloShutter(d, shutter=shutter,
                                              reverse=piccoloCfg.cfg['channels'][c]['reverse'],
                                              fibreDiameter=piccoloCfg.cfg['channels'][c]['fibreDiameter'])
+
+    if not ok:
+        log.error('failed to initialise shutters')
+        sys.exit(1)
+        
     for c in shutters:
         pd.registerComponent(shutters[c])
 

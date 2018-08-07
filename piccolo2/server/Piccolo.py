@@ -320,6 +320,7 @@ class PiccoloThread(PiccoloWorkerThread):
         spectra = []
         for s in self._integrationTimes.spectrometers:
             spectrum = self._spectrometers[s].getSpectrum()
+            spectrum['fibreDiameter'] = self._shutters[shutter].fibreDiameter
             spectra.append(spectrum)
 
         self.closeShutter(shutter)

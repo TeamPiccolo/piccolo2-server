@@ -34,7 +34,7 @@ defaultCfgStr = """
 
 [channels]
   [[__many__]]
-    shutter = integer(default=-1)
+    direction = string
     reverse = boolean(default=False) # Is the polarity of the shutter connection reversed?
     fibreDiameter = integer(default=600) # micrometres
 

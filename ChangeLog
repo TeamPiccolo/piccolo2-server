@@ -1,3 +1,9 @@
+2018-08-07 Magnus Hagdorn
+ * pdata/piccolo.config: change channel configuration
+ * piccolo2/pserver.py: change how shutters are defined
+ * piccolo2/server/Piccolo.py: store fibre diameter in header
+ * piccolo2/server/PiccoloConfig.py: require direction key/value pair
+
 2018-06-01 Magnus Hagdorn
  * piccolo2/server/Piccolo.py: include timezone info
  * piccolo2/server/PiccoloScheduler.py: handle timezone
