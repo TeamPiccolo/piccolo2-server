@@ -2,6 +2,12 @@ import threading
 import time
 import signal
 
+try:
+    import RPi.GPIO as GPIO
+    haveGPIO = True
+except:
+    haveGPIO = False
+
 class DummyLED(object):
     def turnOn(self):
         pass
@@ -71,6 +77,10 @@ class PiccoloStatusLED(object):
         self.stopped = True
         self._status_thread.running = False
         self._status_thread.join()
+
+        #If called by __del__, GPIO might already be unloaded
+        if haveGPIO and GPIO:
+            GPIO.cleanup()
 
     def __del__(self):
         if not self.stopped:

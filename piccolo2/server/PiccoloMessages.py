@@ -27,7 +27,7 @@ import threading
 from Queue import Queue
 import logging
 import sqlite3
-from PiccoloWorkerThread import PiccoloWorkerThread
+from piccolo2.common import PiccoloWorkerThread
 
 class PiccoloMessagesWorker(PiccoloWorkerThread):
     LOGNAME = 'messageBackend'

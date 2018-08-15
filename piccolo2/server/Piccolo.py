@@ -24,10 +24,10 @@ __all__ = ['Piccolo']
 
 from PiccoloInstrument import PiccoloInstrument
 from PiccoloDataDir import PiccoloDataDir
-from PiccoloWorkerThread import PiccoloWorkerThread
+from piccolo2.common import PiccoloWorkerThread
 from PiccoloSpectrometer import PiccoloSpectraList
 from PiccoloMessages import PiccoloMessages
-from piccolo2.PiccoloStatus import PiccoloStatus, PiccoloExtendedStatus
+from piccolo2.common import PiccoloStatus, PiccoloExtendedStatus
 import PiccoloSimplify
 import socket
 import psutil

@@ -18,7 +18,7 @@
 __all__ = ['PiccoloControllerXbee']
 
 from PiccoloController import PiccoloController
-from PiccoloWorkerThread import PiccoloWorkerThread
+from piccolo2.common import PiccoloWorkerThread
 haveRadio=True
 try:
     from piccolo2.hardware import radio

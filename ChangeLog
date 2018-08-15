@@ -1,3 +1,12 @@
+2018-08-15 Magnus Hagdorn
+ * piccolo2/server/Piccolo.py:  adjust import from piccolo2.common
+ * piccolo2/server/PiccoloControllerXbee.py: ditto
+ * piccolo2/server/PiccoloMessages.py: ditto
+ * piccolo2/server/PiccoloSpectrometer.py: ditto
+ * piccolo2/server/PiccoloStatusLED.py: avoid crashing when no gpio module is
+   present
+ * piccolo2/server/PiccoloWorkerThread.py: removed - use from piccolo2.common
+
 2018-08-07 Magnus Hagdorn
  * pdata/piccolo.config: change channel configuration
  * piccolo2/pserver.py: change how shutters are defined

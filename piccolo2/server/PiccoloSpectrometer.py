@@ -26,9 +26,9 @@ tasks (such as communication) are being performed.
 
 __all__ = ['PiccoloSpectrometer']
 
-from piccolo2.PiccoloSpectra import *
+from piccolo2.common import PiccoloSpectraList, PiccoloSpectrum
 from PiccoloInstrument import PiccoloInstrument
-from PiccoloWorkerThread import PiccoloWorkerThread
+from piccolo2.common import PiccoloWorkerThread
 import time
 import threading
 from Queue import Queue
